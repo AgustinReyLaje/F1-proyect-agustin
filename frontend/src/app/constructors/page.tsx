@@ -47,7 +47,7 @@ export default function ConstructorsPage() {
       <div 
         className="fixed inset-0 z-0"
         style={{
-          backgroundImage: 'url(/images/f1-circuits-2024.jpg)',
+          backgroundImage: 'url(/images/tracks.png)',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
@@ -55,7 +55,7 @@ export default function ConstructorsPage() {
         }}
       >
         {/* Dark overlay for better readability */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/85 via-black/80 to-black/90" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/75" />
       </div>
 
       <main className="relative z-10 container mx-auto px-4 py-8 max-w-7xl">
