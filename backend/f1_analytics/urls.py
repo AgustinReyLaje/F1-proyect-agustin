@@ -16,8 +16,30 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
+
+@require_http_methods(["GET"])
+def api_root(request):
+    """Root endpoint with API information"""
+    return JsonResponse({
+        'message': 'F1 Analytics Platform API',
+        'version': '1.0',
+        'endpoints': {
+            'api': '/api/v1/',
+            'admin': '/admin/',
+            'drivers': '/api/v1/drivers/',
+            'constructors': '/api/v1/constructors/',
+            'races': '/api/v1/races/',
+            'standings': '/api/v1/championship-standings/',
+            'seasons': '/api/v1/seasons/',
+        },
+        'documentation': 'https://github.com/AgustinReyLaje/F1-proyect-agustin',
+        'frontend': 'http://localhost:3000'
+    })
 
 urlpatterns = [
+    path('', api_root, name='api-root'),
     path('admin/', admin.site.urls),
     path('api/v1/', include('api.urls')),
 ]
