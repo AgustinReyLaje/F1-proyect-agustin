@@ -42,21 +42,37 @@ export default function ConstructorsPage() {
   );
 
   return (
-    <main className="container mx-auto px-4 py-8 max-w-7xl">
-      {/* Header */}
-      <div className="mb-8">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 text-gray-600 hover:text-f1-red transition-colors mb-4"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Home
-        </Link>
-        <h1 className="text-4xl font-bold mb-2">F1 Constructors</h1>
-        <p className="text-gray-600 dark:text-gray-300">
-          Browse all Formula 1 teams in the 2024 season
-        </p>
+    <div className="relative min-h-screen">
+      {/* Background Image with Overlay */}
+      <div 
+        className="fixed inset-0 z-0"
+        style={{
+          backgroundImage: 'url(/images/f1-circuits-2024.jpg)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          backgroundAttachment: 'fixed',
+        }}
+      >
+        {/* Dark overlay for better readability */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/85 via-black/80 to-black/90" />
       </div>
+
+      <main className="relative z-10 container mx-auto px-4 py-8 max-w-7xl">
+        {/* Header */}
+        <div className="mb-8">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-gray-400 hover:text-f1-red transition-colors mb-4"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Home
+          </Link>
+          <h1 className="text-4xl font-bold mb-2 text-white">F1 Constructors</h1>
+          <p className="text-gray-300">
+            Browse all Formula 1 teams in the {currentSeason} season
+          </p>
+        </div>
 
       {/* Search */}
       <div className="mb-8">
@@ -67,7 +83,7 @@ export default function ConstructorsPage() {
             placeholder="Search by name or nationality..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-f1-red focus:border-transparent outline-none"
+            className="w-full pl-10 pr-4 py-3 border border-gray-600 rounded-lg bg-gray-900/80 backdrop-blur-sm text-white placeholder-gray-400 focus:ring-2 focus:ring-f1-red focus:border-transparent outline-none"
           />
         </div>
       </div>
@@ -81,8 +97,8 @@ export default function ConstructorsPage() {
 
       {/* Error State */}
       {error && !loading && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6 text-center">
-          <p className="text-red-800 dark:text-red-200">{error}</p>
+        <div className="bg-red-900/30 backdrop-blur-sm border border-red-500/50 rounded-lg p-6 text-center">
+          <p className="text-red-200">{error}</p>
           <button
             onClick={loadConstructors}
             className="mt-4 px-6 py-2 bg-f1-red text-white rounded-lg hover:bg-red-700 transition-colors"
@@ -103,13 +119,14 @@ export default function ConstructorsPage() {
 
           {filteredConstructors.length === 0 && (
             <div className="text-center py-20">
-              <p className="text-xl text-gray-500">
+              <p className="text-xl text-gray-300">
                 No constructors found matching your criteria
               </p>
             </div>
           )}
         </>
       )}
-    </main>
+      </main>
+    </div>
   );
 }
