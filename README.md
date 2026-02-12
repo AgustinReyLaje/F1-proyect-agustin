@@ -13,8 +13,6 @@ Una plataforma fullstack para análisis de datos de Fórmula 1 con arquitectura 
 
 ## 🏗️ Arquitectura
 
-### **Clean Architecture con Backend/Frontend Separados**
-
 ```
 F1Agustin/
 │
