@@ -40,7 +40,10 @@ class ConstructorSeasonSerializer(serializers.ModelSerializer):
 class ConstructorSerializer(serializers.ModelSerializer):
     drivers = serializers.SerializerMethodField()
     championship_position = serializers.SerializerMethodField()
-    season_data = serializers.SerializerMethodField()
+    car_model = serializers.SerializerMethodField()
+    car_image_url = serializers.SerializerMethodField()
+    team_color = serializers.SerializerMethodField()
+    team_color_secondary = serializers.SerializerMethodField()
     
     class Meta:
         model = Constructor
@@ -48,51 +51,53 @@ class ConstructorSerializer(serializers.ModelSerializer):
             'id', 'constructor_id', 'name', 'nationality', 
             'url', 'car_model', 'car_image_url', 'team_color', 
             'team_color_secondary', 'drivers', 'championship_position',
-            'season_data', 'created_at', 'updated_at'
+            'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
     
-    def get_season_data(self, obj):
-        """Get season-specific data for the requested season or active season"""
+    def _get_season_year(self):
+        """Helper to get season year from request or active season"""
         request = self.context.get('request')
-        season_year = None
-        
         if request and 'season' in request.query_params:
-            season_year = int(request.query_params['season'])
-        else:
-            # Get active season
-            active_season = Season.objects.filter(is_active=True).first()
-            if active_season:
-                season_year = active_season.year
+            return int(request.query_params['season'])
         
-        if season_year:
-            try:
-                season_data = ConstructorSeason.objects.get(
-                    constructor=obj,
-                    season__year=season_year
-                )
-                return {
-                    'year': season_year,
-                    'car_model': season_data.car_model,
-                    'car_image_url': season_data.car_image_url,
-                    'team_color': season_data.team_color,
-                    'team_color_secondary': season_data.team_color_secondary,
-                }
-            except ConstructorSeason.DoesNotExist:
-                pass
-        return None
+        active_season = Season.objects.filter(is_active=True).first()
+        return active_season.year if active_season else 2024
+    
+    def _get_constructor_season(self, obj):
+        """Get ConstructorSeason for current season if exists"""
+        season_year = self._get_season_year()
+        try:
+            return ConstructorSeason.objects.get(
+                constructor=obj,
+                season__year=season_year
+            )
+        except ConstructorSeason.DoesNotExist:
+            return None
+    
+    def get_car_model(self, obj):
+        """Get car model from ConstructorSeason or fallback to base model"""
+        season_data = self._get_constructor_season(obj)
+        return season_data.car_model if season_data and season_data.car_model else obj.car_model
+    
+    def get_car_image_url(self, obj):
+        """Get car image from ConstructorSeason or fallback to base model"""
+        season_data = self._get_constructor_season(obj)
+        return season_data.car_image_url if season_data and season_data.car_image_url else obj.car_image_url
+    
+    def get_team_color(self, obj):
+        """Get team color from ConstructorSeason or fallback to base model"""
+        season_data = self._get_constructor_season(obj)
+        return season_data.team_color if season_data and season_data.team_color else obj.team_color
+    
+    def get_team_color_secondary(self, obj):
+        """Get secondary team color from ConstructorSeason or fallback to base model"""
+        season_data = self._get_constructor_season(obj)
+        return season_data.team_color_secondary if season_data and season_data.team_color_secondary else obj.team_color_secondary
     
     def get_drivers(self, obj):
-        # Get season from request or use active season
-        request = self.context.get('request')
-        season_year = 2024  # Default
-        
-        if request and 'season' in request.query_params:
-            season_year = int(request.query_params['season'])
-        else:
-            active_season = Season.objects.filter(is_active=True).first()
-            if active_season:
-                season_year = active_season.year
+        """Get drivers for this constructor in the specified season"""
+        season_year = self._get_season_year()
         
         # Get unique drivers for this constructor from specified season results
         from django.db.models import Q
@@ -103,16 +108,8 @@ class ConstructorSerializer(serializers.ModelSerializer):
         return DriverSerializer(drivers, many=True).data
     
     def get_championship_position(self, obj):
-        # Get season from request or use active season
-        request = self.context.get('request')
-        season_year = 2024  # Default
-        
-        if request and 'season' in request.query_params:
-            season_year = int(request.query_params['season'])
-        else:
-            active_season = Season.objects.filter(is_active=True).first()
-            if active_season:
-                season_year = active_season.year
+        """Get constructor championship standing for specified season"""
+        season_year = self._get_season_year()
         
         # Get constructor championship standing for specified season
         try:
