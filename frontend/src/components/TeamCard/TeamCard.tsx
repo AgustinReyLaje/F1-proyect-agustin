@@ -16,32 +16,6 @@ export default function TeamCard({ constructor }: TeamCardProps) {
   const primaryColor = constructor.team_color || '#DC0000';
   const secondaryColor = constructor.team_color_secondary || '#1a1a1a';
 
-  // Championship position glow effect - ALWAYS visible for top 3
-  // Enhanced with stronger, more noticeable effects
-  const getChampionshipGlow = () => {
-    if (!constructor.championship_position) return '';
-    
-    switch (constructor.championship_position.position) {
-      case 1:
-        // Gold glow - Strong and prominent
-        return isHovered 
-          ? 'shadow-[0_0_50px_rgba(255,215,0,0.9),0_0_30px_rgba(255,215,0,0.7),0_0_15px_rgba(255,215,0,0.5)] ring-4 ring-yellow-400/70'
-          : 'shadow-[0_0_35px_rgba(255,215,0,0.6),0_0_20px_rgba(255,215,0,0.4),0_0_10px_rgba(255,215,0,0.3)] ring-2 ring-yellow-400/50';
-      case 2:
-        // Silver glow - Strong and noticeable
-        return isHovered
-          ? 'shadow-[0_0_45px_rgba(192,192,192,0.85),0_0_25px_rgba(192,192,192,0.65),0_0_12px_rgba(192,192,192,0.45)] ring-4 ring-gray-300/70'
-          : 'shadow-[0_0_30px_rgba(192,192,192,0.55),0_0_18px_rgba(192,192,192,0.35),0_0_8px_rgba(192,192,192,0.25)] ring-2 ring-gray-300/50';
-      case 3:
-        // Bronze glow - Strong and noticeable
-        return isHovered
-          ? 'shadow-[0_0_45px_rgba(205,127,50,0.85),0_0_25px_rgba(205,127,50,0.65),0_0_12px_rgba(205,127,50,0.45)] ring-4 ring-orange-600/70'
-          : 'shadow-[0_0_30px_rgba(205,127,50,0.55),0_0_18px_rgba(205,127,50,0.35),0_0_8px_rgba(205,127,50,0.25)] ring-2 ring-orange-600/50';
-      default:
-        return '';
-    }
-  };
-
   return (
     <article
       className={`
@@ -49,8 +23,8 @@ export default function TeamCard({ constructor }: TeamCardProps) {
         bg-white dark:bg-gray-800
         transition-all duration-500 ease-out
         group cursor-pointer
+        shadow-lg hover:shadow-2xl
         ${isHovered ? 'scale-[1.03] z-20' : 'scale-100 z-10'}
-        ${getChampionshipGlow() || 'shadow-lg hover:shadow-2xl'}
       `}
       style={{ 
         borderLeft: `4px solid ${primaryColor}`,

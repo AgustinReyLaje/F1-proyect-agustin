@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Season, Driver, DriverSeason, Constructor, ConstructorSeason, Race, Result, Lap, ChampionshipStanding
+from .models import Season, Driver, DriverSeason, Constructor, ConstructorSeason, Race, Result, Lap, ChampionshipStanding, Qualifying, Sprint
 
 
 @admin.register(Season)
@@ -72,3 +72,21 @@ class ChampionshipStandingAdmin(admin.ModelAdmin):
     def get_entity(self, obj):
         return obj.driver if obj.driver else obj.constructor
     get_entity.short_description = 'Driver/Constructor'
+
+
+@admin.register(Qualifying)
+class QualifyingAdmin(admin.ModelAdmin):
+    list_display = ['race', 'position', 'driver', 'constructor', 'q1_time', 'q2_time', 'q3_time']
+    search_fields = ['driver__last_name', 'constructor__name']
+    list_filter = ['race__season']
+    raw_id_fields = ['race', 'driver', 'constructor']
+    ordering = ['race', 'position']
+
+
+@admin.register(Sprint)
+class SprintAdmin(admin.ModelAdmin):
+    list_display = ['race', 'final_position', 'driver', 'constructor', 'points', 'status']
+    search_fields = ['driver__last_name', 'constructor__name']
+    list_filter = ['race__season', 'status']
+    raw_id_fields = ['race', 'driver', 'constructor']
+    ordering = ['race', 'final_position']

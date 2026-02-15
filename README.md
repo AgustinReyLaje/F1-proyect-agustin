@@ -4,13 +4,33 @@ Una plataforma fullstack para análisis de datos de Fórmula 1 con arquitectura 
 
 ## ✨ Características
 
+### 🏁 **Race Weekend Complete Structure**
+- **Starting Grid**: Qualifying results with team colors
+- **Sprint Races**: Sprint weekend support (when available)
+- **Race Results**: Full race results with podium emphasis
+  - 🥇 Gold, 🥈 Silver, 🥉 Bronze visual styling for P1/P2/P3
+- **DNF Display**: Retirement reasons (Engine failure, Collision, etc.)
+- **Progressive Championship**: Standings after each race (cumulative timeline)
+
+### 📊 **Data & Analytics**
 - 📊 Datos reales de F1 desde API externa (Jolpica F1 API)
-- 🏎️ Gestión de pilotos, constructores y carreras
+- 🏎️ Gestión de pilotos con career statistics (wins, podiums, championships)
 - 🏁 Resultados de carreras y clasificaciones
 - 🏆 Championship standings en tiempo real
-- 🎨 Interfaz moderna con Next.js 14 y Tailwind CSS
 - 🔄 Soporte multi-temporada (2020-2025)
+- 📈 Progressive standings calculation (points accumulation by round)
+
+### 🎨 **UI/UX Excellence**
+- 🎨 Interfaz moderna con Next.js 14 y Tailwind CSS
+- 🎯 Driver panel with custom F1-red scrollbar
+- 🖼️ Team colors integrated throughout
+- 📱 Fully responsive design
+- ⚡ Dynamic race detail pages with tabbed navigation
+
+### 🐳 **DevOps Ready**
 - 🐳 Totalmente dockerizado (backend + frontend + PostgreSQL)
+- 🔧 Hot reload en desarrollo
+- 📦 Production-ready containers
 
 ## 🏗️ Arquitectura
 
@@ -87,10 +107,16 @@ docker-compose exec backend python manage.py import_f1_data --season 2024 --calc
 - **API**: http://localhost:8000/api/v1/
 - **Admin Django**: http://localhost:8000/admin/
 
+### 5. Popular datos de race weekend (qualifying y DNF reasons)
+```bash
+docker-compose exec backend python populate_qualifying.py
+```
+
 ## 📖 Documentación Completa
 
 Para más información detallada, consulta:
 - [📚 Documentación completa](documentacion/README.md)
+- [🏁 Race Weekend Implementation](documentacion/RACE-WEEKEND-IMPLEMENTATION.md) ⭐ **NEW**
 - [🐳 Guía de Docker](docker/DOCKER.md)
 - [⚡ Quick Start](documentacion/QUICKSTART.md)
 - [🚀 Deployment](documentacion/DEPLOYMENT.md)
@@ -118,6 +144,34 @@ Para más información detallada, consulta:
 
 ## 📝 Características principales
 
+### Race Weekend Complete Structure ⭐ **NEW**
+Sistema completo de fin de semana de carreras con estructura modular:
+
+#### **1. Race Detail Pages** (`/races/[id]`)
+- **Starting Grid**: Qualifying results con posiciones y equipos
+- **Sprint Race**: Resultados de sprint (cuando aplica)
+- **Race Results**: 
+  - Podio enfatizado con tarjetas grandes 🥇🥈🥉
+  - Gold/Silver/Bronze gradient styling
+  - Tabla completa de todos los finishers
+- **DNF Display**: Razones de retiro ("Engine failure", "Collision", etc.)
+- **Championship Timeline**: Standings progresivos después de cada carrera
+
+#### **2. Progressive Championship Standings**
+- **API Endpoint**: `/api/v1/standings/progressive/`
+- **Funcionalidad**: Calcula puntos acumulados desde Race 1 hasta round específico
+- **Uso**: Ver cómo estaba el campeonato después de cada carrera
+- **Ejemplo**: 
+  - Round 5: Verstappen 110 pts, Norris 83 pts
+  - Round 12: Verstappen 265 pts, Norris 189 pts
+  - Round 24: Verstappen 399 pts, Norris 344 pts
+
+#### **3. Driver Panel Improvements**
+- ✅ Mayor ancho de panel izquierdo (384px)
+- ✅ Scrollbar personalizado con color F1-red
+- ✅ Scroll independiente para detalles del piloto
+- ✅ Layout protegido que nunca colapsa
+
 ### Multi-Season Support
 Sistema completo de soporte para múltiples temporadas (2020-2025):
 - Selector de temporada global en el navbar
@@ -128,12 +182,14 @@ Sistema completo de soporte para múltiples temporadas (2020-2025):
 - Visualización de clasificaciones de pilotos y constructores
 - Efectos visuales especiales para el podio (oro/plata/bronce)
 - Cálculo en tiempo real basado en resultados de carreras
+- **Standings progresivos por round** ⭐ **NEW**
 
 ### Constructor Cards
 - Tarjetas con información de equipos
 - Efectos de brillo para posiciones de campeonato
 - Imágenes de autos por temporada
 - Colores oficiales de equipos
+- **P1/P2/P3 color badges** ⭐ **NEW**
 
 ## 🤝 Contribuir
 

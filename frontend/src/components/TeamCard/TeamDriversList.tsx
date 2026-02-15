@@ -43,7 +43,7 @@ export default function TeamDriversList({
         {drivers.map((driver, index) => (
           <li key={driver.id}>
             <Link
-              href={`/drivers#driver-${driver.id}`}
+              href={`/drivers?driver=${driver.id}`}
               className={`
                 flex items-center justify-between p-3 rounded-lg
                 transition-all duration-300

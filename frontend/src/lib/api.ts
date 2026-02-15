@@ -68,6 +68,13 @@ export const f1Api = {
   getDriver: (id: number) =>
     api.get(`/drivers/${id}/`),
 
+  // Driver Seasons (with team data, colors, and career stats)
+  getDriverSeasons: (params?: { season__year?: number; driver?: number; constructor?: number }) =>
+    api.get('/driver-seasons/', { params }),
+  
+  getDriverSeason: (id: number) =>
+    api.get(`/driver-seasons/${id}/`),
+
   // Constructors
   getConstructors: (params?: { nationality?: string; search?: string; season?: number }) =>
     api.get('/constructors/', { params }),
@@ -95,6 +102,18 @@ export const f1Api = {
   
   getStanding: (id: number) =>
     api.get(`/standings/${id}/`),
+
+  // Progressive standings (cumulative points up to a specific round)
+  getProgressiveStandings: (params: { season: number; round: number; type?: 'driver' | 'constructor' }) =>
+    api.get('/standings/progressive/', { params }),
+
+  // Qualifying
+  getQualifying: (params?: { race__season?: number; race?: number; driver?: number }) =>
+    api.get('/qualifying/', { params }),
+
+  // Sprint
+  getSprint: (params?: { race__season?: number; race?: number; driver?: number }) =>
+    api.get('/sprint/', { params }),
 
   // Laps
   getLaps: (params?: { race?: number; driver?: number }) =>

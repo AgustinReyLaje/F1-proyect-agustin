@@ -21,11 +21,22 @@ export default function RacesPage() {
     try {
       setLoading(true);
       setError(null);
+      // Fetch all races with high limit to avoid pagination issues
       const response = await f1Api.getRaces({ season: currentSeason });
       
-      // Handle paginated response
-      const data = response.data.results || response.data;
-      const races = Array.isArray(data) ? data : [];
+      // Handle paginated response - fetch all pages if needed
+      let allRaces = response.data.results || response.data;
+      
+      // If paginated and has more pages, fetch them all
+      let nextUrl = response.data.next;
+      while (nextUrl) {
+        const nextResponse = await fetch(nextUrl);
+        const nextData = await nextResponse.json();
+        allRaces = [...allRaces, ...(nextData.results || [])];
+        nextUrl = nextData.next;
+      }
+      
+      const races = Array.isArray(allRaces) ? allRaces : [];
       
       // Sort by round
       const sortedRaces = races.sort(
@@ -41,61 +52,77 @@ export default function RacesPage() {
   };
 
   return (
-    <main className="container mx-auto px-4 py-8 max-w-7xl">
-      {/* Header */}
-      <div className="mb-8">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 text-gray-600 hover:text-f1-red transition-colors mb-4"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Home
-        </Link>
-        <h1 className="text-4xl font-bold mb-2">F1 Race Calendar</h1>
-        <p className="text-gray-600 dark:text-gray-300">
-          All Formula 1 races for the {currentSeason} season
-        </p>
+    <div className="relative min-h-screen">
+      {/* Background Image with Overlay */}
+      <div 
+        className="fixed inset-0 z-0"
+        style={{
+          backgroundImage: 'url(/images/tracks.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          backgroundAttachment: 'fixed',
+        }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/75" />
       </div>
 
-      {/* Loading State */}
-      {loading && (
-        <div className="flex justify-center items-center py-20">
-          <Loader2 className="w-8 h-8 animate-spin text-f1-red" />
-        </div>
-      )}
-
-      {/* Error State */}
-      {error && !loading && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6 text-center">
-          <p className="text-red-800 dark:text-red-200">{error}</p>
-          <button
-            onClick={loadRaces}
-            className="mt-4 px-6 py-2 bg-f1-red text-white rounded-lg hover:bg-red-700 transition-colors"
+      <main className="relative z-10 container mx-auto px-4 py-8 max-w-7xl">
+        {/* Header */}
+        <div className="mb-8">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-gray-400 hover:text-f1-red transition-colors mb-4"
           >
-            Retry
-          </button>
+            <ArrowLeft className="w-4 h-4" />
+            Back to Home
+          </Link>
+          <h1 className="text-4xl font-bold mb-2 text-white">F1 Race Calendar</h1>
+          <p className="text-gray-300">
+            All Formula 1 races for the {currentSeason} season
+          </p>
         </div>
-      )}
 
-      {/* Races List */}
-      {!loading && !error && (
-        <>
-          {races.length > 0 ? (
-            <div className="space-y-4">
-              {races.map((race) => (
-                <RaceCard key={race.id} race={race} />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-20">
-              <p className="text-xl text-gray-500">
-                No races found for the {season} season
-              </p>
-            </div>
-          )}
-        </>
-      )}
-    </main>
+        {/* Loading State */}
+        {loading && (
+          <div className="flex justify-center items-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-f1-red" />
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && !loading && (
+          <div className="bg-red-900/30 backdrop-blur-sm border border-red-500/50 rounded-lg p-6 text-center">
+            <p className="text-red-200">{error}</p>
+            <button
+              onClick={loadRaces}
+              className="mt-4 px-6 py-2 bg-f1-red text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {/* Races List */}
+        {!loading && !error && (
+          <>
+            {races.length > 0 ? (
+              <div className="space-y-4">
+                {races.map((race) => (
+                  <RaceCard key={race.id} race={race} />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-20">
+                <p className="text-xl text-gray-300">
+                  No races found for the {currentSeason} season
+                </p>
+              </div>
+            )}
+          </>
+        )}
+      </main>
+    </div>
   );
 }
 
@@ -104,70 +131,59 @@ function RaceCard({ race }: { race: Race }) {
   const isPastRace = raceDate < new Date();
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg hover:shadow-xl transition-all p-6 border-l-4 border-f1-red">
-      <div className="flex flex-col md:flex-row md:items-center gap-4">
-        {/* Round Badge */}
-        <div className="flex-shrink-0">
-          <div className="bg-f1-red text-white px-4 py-2 rounded-lg text-center">
-            <div className="text-xs font-semibold uppercase">Round</div>
-            <div className="text-2xl font-bold">{race.round}</div>
-          </div>
-        </div>
-
-        {/* Race Info */}
-        <div className="flex-1">
-          <h3 className="text-2xl font-bold mb-2">{race.race_name}</h3>
-          <div className="flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400">
-            <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4" />
-              <span>{race.circuit_name}</span>
+    <Link href={`/races/${race.id}`}>
+      <div className="bg-gray-900/90 backdrop-blur-sm rounded-xl shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all p-6 border-l-4 border-f1-red border border-gray-700 cursor-pointer">
+        <div className="flex flex-col md:flex-row md:items-center gap-4">
+          {/* Round Badge */}
+          <div className="flex-shrink-0">
+            <div className="bg-f1-red text-white px-4 py-2 rounded-lg text-center">
+              <div className="text-xs font-semibold uppercase">Round</div>
+              <div className="text-2xl font-bold">{race.round}</div>
             </div>
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4" />
-              <span>
-                {raceDate.toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })}
+          </div>
+
+          {/* Race Info */}
+          <div className="flex-1">
+            <h3 className="text-2xl font-bold mb-2 text-white">{race.race_name}</h3>
+            <div className="flex flex-wrap gap-4 text-sm text-gray-400">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4" />
+                <span>{race.circuit_name}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                <span>
+                  {raceDate.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
+                </span>
+              </div>
+            </div>
+            <div className="mt-2 text-sm">
+              <span className="text-gray-400">Location:</span>{' '}
+              <span className="font-semibold text-gray-200">
+                {race.locality}, {race.country}
               </span>
             </div>
           </div>
-          <div className="mt-2 text-sm">
-            <span className="text-gray-500">Location:</span>{' '}
-            <span className="font-semibold">
-              {race.locality}, {race.country}
+
+          {/* Status Badge */}
+          <div className="flex-shrink-0">
+            <span
+              className={`px-4 py-2 rounded-lg text-sm font-semibold ${
+                isPastRace
+                  ? 'bg-gray-800 text-gray-300'
+                  : 'bg-green-900/40 text-green-400 border border-green-500/30'
+              }`}
+            >
+              {isPastRace ? 'View Results' : 'Upcoming'}
             </span>
           </div>
         </div>
-
-        {/* Status Badge */}
-        <div className="flex-shrink-0">
-          <span
-            className={`px-4 py-2 rounded-lg text-sm font-semibold ${
-              isPastRace
-                ? 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-            }`}
-          >
-            {isPastRace ? 'Completed' : 'Upcoming'}
-          </span>
-        </div>
       </div>
-
-      {race.url && (
-        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-          <a
-            href={race.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-f1-red hover:text-red-700 font-medium text-sm"
-          >
-            View Race Details →
-          </a>
-        </div>
-      )}
-    </div>
+    </Link>
   );
 }

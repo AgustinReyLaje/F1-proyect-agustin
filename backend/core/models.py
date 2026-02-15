@@ -173,6 +173,7 @@ class Result(models.Model):
         ('retired', 'Retired'),
     ]
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='finished')
+    retirement_reason = models.CharField(max_length=255, blank=True, null=True, help_text='Reason for DNF/retirement (e.g., Engine failure, Collision)')
     
     fastest_lap = models.IntegerField(null=True, blank=True, help_text="Lap number of fastest lap")
     fastest_lap_time = models.CharField(max_length=20, null=True, blank=True)
@@ -219,6 +220,76 @@ class Lap(models.Model):
 
     def __str__(self):
         return f"{self.driver} - {self.race} - Lap {self.lap_number}: {self.lap_time}"
+
+
+class Qualifying(models.Model):
+    """
+    Represents qualifying results for a specific race.
+    """
+    race = models.ForeignKey(Race, on_delete=models.CASCADE, related_name='qualifying_results')
+    driver = models.ForeignKey(Driver, on_delete=models.CASCADE, related_name='qualifying_results')
+    constructor = models.ForeignKey(Constructor, on_delete=models.CASCADE, related_name='qualifying_results')
+    
+    position = models.IntegerField(help_text="Qualifying position")
+    q1_time = models.CharField(max_length=20, null=True, blank=True, help_text="Q1 time")
+    q2_time = models.CharField(max_length=20, null=True, blank=True, help_text="Q2 time")
+    q3_time = models.CharField(max_length=20, null=True, blank=True, help_text="Q3 time")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['race', 'position']
+        unique_together = ['race', 'driver']
+        indexes = [
+            models.Index(fields=['race', 'position']),
+            models.Index(fields=['driver', 'race']),
+        ]
+
+    def __str__(self):
+        return f"{self.driver} - {self.race} Qualifying - P{self.position}"
+
+
+class Sprint(models.Model):
+    """
+    Represents sprint race results (only exists for sprint weekends).
+    """
+    race = models.ForeignKey(Race, on_delete=models.CASCADE, related_name='sprint_results')
+    driver = models.ForeignKey(Driver, on_delete=models.CASCADE, related_name='sprint_results')
+    constructor = models.ForeignKey(Constructor, on_delete=models.CASCADE, related_name='sprint_results')
+    
+    grid_position = models.IntegerField(help_text="Starting grid position for sprint")
+    final_position = models.IntegerField(null=True, blank=True, help_text="Final sprint position")
+    position_text = models.CharField(max_length=10, help_text="Position text (handles DNF, DSQ, etc)")
+    points = models.FloatField(default=0.0)
+    laps_completed = models.IntegerField(default=0)
+    
+    STATUS_CHOICES = [
+        ('finished', 'Finished'),
+        ('dnf', 'Did Not Finish'),
+        ('dsq', 'Disqualified'),
+        ('dns', 'Did Not Start'),
+        ('retired', 'Retired'),
+    ]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='finished')
+    retirement_reason = models.CharField(max_length=255, blank=True, null=True, help_text='Reason for DNF/retirement')
+    
+    fastest_lap_time = models.CharField(max_length=20, null=True, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['race', 'final_position']
+        unique_together = ['race', 'driver']
+        indexes = [
+            models.Index(fields=['race', 'final_position']),
+            models.Index(fields=['driver', 'race']),
+            models.Index(fields=['points']),
+        ]
+
+    def __str__(self):
+        return f"{self.driver} - {self.race} Sprint - P{self.position_text}"
 
 
 class ChampionshipStanding(models.Model):

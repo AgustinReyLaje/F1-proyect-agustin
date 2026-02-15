@@ -58,8 +58,20 @@ export default function TeamCardHoverInfo({
           
           <div className="flex items-baseline gap-3">
             <span 
-              className="text-3xl font-bold"
-              style={{ color: primaryColor }}
+              className={`text-3xl font-bold ${
+                constructor.championship_position.position === 1 
+                  ? 'text-yellow-400' 
+                  : constructor.championship_position.position === 2 
+                  ? 'text-gray-300' 
+                  : constructor.championship_position.position === 3 
+                  ? 'text-orange-600' 
+                  : ''
+              }`}
+              style={
+                constructor.championship_position.position > 3 
+                  ? { color: primaryColor } 
+                  : undefined
+              }
               aria-label={`Position ${constructor.championship_position.position}`}
             >
               P{constructor.championship_position.position}
