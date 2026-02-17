@@ -32,20 +32,21 @@ class F1DataService:
     def _rate_limit_wait(self):
         """Implement rate limiting to avoid hitting API limits"""
         elapsed = time.time() - self.last_request_time
-        min_interval = 1.0 / self.rate_limit
+        min_interval = 1.0 / min(self.rate_limit, 2)  # Cap at 2 req/s max
         
         if elapsed < min_interval:
             time.sleep(min_interval - elapsed)
         
         self.last_request_time = time.time()
     
-    def _make_request(self, endpoint: str, params: Optional[Dict] = None) -> Dict:
+    def _make_request(self, endpoint: str, params: Optional[Dict] = None, _retries: int = 5) -> Dict:
         """
-        Make a request to the F1 API with rate limiting.
+        Make a request to the F1 API with rate limiting and automatic retry on 429.
         
         Args:
             endpoint: API endpoint path
             params: Query parameters
+            _retries: Number of retries left on 429 errors
             
         Returns:
             JSON response data
@@ -58,7 +59,15 @@ class F1DataService:
         url = f"{self.base_url}/{endpoint}.json"
         
         try:
-            response = requests.get(url, params=params, timeout=10)
+            response = requests.get(url, params=params, timeout=30)
+            
+            # Handle 429 Too Many Requests with exponential backoff
+            if response.status_code == 429 and _retries > 0:
+                wait = 2 ** (5 - _retries) + 1  # 2s, 3s, 5s, 9s, 17s
+                print(f"    ⏳ Rate limited (429). Waiting {wait}s... ({_retries} retries left)")
+                time.sleep(wait)
+                return self._make_request(endpoint, params, _retries - 1)
+            
             response.raise_for_status()
             
             # Check if response is JSON
@@ -205,6 +214,50 @@ class F1DataService:
             standings_lists = data['MRData']['StandingsTable']['StandingsLists']
             if standings_lists:
                 return standings_lists[0].get('DriverStandings', [])
+            return []
+        except KeyError:
+            return []
+    
+    def fetch_qualifying(self, season: int, round_number: int) -> List[Dict]:
+        """
+        Fetch qualifying results for a specific race.
+        
+        Args:
+            season: Year of the season
+            round_number: Round number of the race
+            
+        Returns:
+            List of qualifying result dictionaries with Q1/Q2/Q3 times
+        """
+        endpoint = f"{season}/{round_number}/qualifying"
+        data = self._make_request(endpoint, params={"limit": 100})
+        
+        try:
+            races = data['MRData']['RaceTable']['Races']
+            if races:
+                return races[0].get('QualifyingResults', [])
+            return []
+        except KeyError:
+            return []
+    
+    def fetch_sprint(self, season: int, round_number: int) -> List[Dict]:
+        """
+        Fetch sprint race results for a specific race.
+        
+        Args:
+            season: Year of the season
+            round_number: Round number of the race
+            
+        Returns:
+            List of sprint result dictionaries
+        """
+        endpoint = f"{season}/{round_number}/sprint"
+        data = self._make_request(endpoint, params={"limit": 100})
+        
+        try:
+            races = data['MRData']['RaceTable']['Races']
+            if races:
+                return races[0].get('SprintResults', [])
             return []
         except KeyError:
             return []

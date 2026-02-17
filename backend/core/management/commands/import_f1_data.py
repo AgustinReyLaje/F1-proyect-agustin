@@ -237,12 +237,9 @@ class Command(BaseCommand):
                 )
                 
                 # Parse status
-                status = 'finished'
-                status_text = result_data.get('status', '').lower()
-                if 'retire' in status_text or 'engine' in status_text or 'collision' in status_text:
-                    status = 'retired'
-                elif 'disqualif' in status_text:
-                    status = 'dsq'
+                status_text = result_data.get('status', '')
+                status = self._parse_status(status_text)
+                retirement_reason = status_text if status in ('retired', 'dsq', 'dns') else ''
                 
                 result, created = Result.objects.update_or_create(
                     race=race,
@@ -255,6 +252,7 @@ class Command(BaseCommand):
                         'points': float(result_data.get('points', 0)),
                         'laps_completed': int(result_data.get('laps', 0)),
                         'status': status,
+                        'retirement_reason': retirement_reason,
                         'fastest_lap': result_data.get('FastestLap', {}).get('lap'),
                         'fastest_lap_time': result_data.get('FastestLap', {}).get('Time', {}).get('time'),
                         'fastest_lap_speed': result_data.get('FastestLap', {}).get('AverageSpeed', {}).get('speed'),
@@ -272,8 +270,21 @@ class Command(BaseCommand):
         
         return imported
 
+    @staticmethod
+    def _parse_status(status_text: str) -> str:
+        """Map Ergast API status text to model status choices."""
+        if not status_text:
+            return 'finished'
+        s = status_text.lower().strip()
+        if s == 'finished' or (s.startswith('+') and 'lap' in s):
+            return 'finished'
+        if 'disqualif' in s or 'excluded' in s or 'irregular' in s:
+            return 'dsq'
+        if 'not start' in s or s == 'dns' or 'withdrew' in s:
+            return 'dns'
+        return 'retired'
+
     def calculate_standings(self, season: int, round_num: int = None):
-        """Calculate championship standings"""
         self.stdout.write(f'Calculating championship standings...')
         
         try:

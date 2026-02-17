@@ -55,38 +55,28 @@ export default function StandingsPage() {
 
   const loadDriverTeams = async (standings: ChampionshipStanding[]) => {
     try {
-      // Get all results for the season to find team assignments
-      let allResults: any[] = [];
-      const resultsResponse = await f1Api.getResults({ race__season: currentSeason });
-      allResults = resultsResponse.data.results || resultsResponse.data;
+      // Use driver-seasons endpoint — much more efficient than loading all results
+      let allDriverSeasons: any[] = [];
+      const dsResponse = await f1Api.getDriverSeasons({ season__year: currentSeason });
+      allDriverSeasons = dsResponse.data.results || dsResponse.data;
       
       // If paginated, fetch all pages
-      let nextUrl = resultsResponse.data.next;
+      let nextUrl = dsResponse.data.next;
       while (nextUrl) {
         const nextResponse = await fetch(nextUrl);
         const nextData = await nextResponse.json();
-        allResults = [...allResults, ...(nextData.results || [])];
+        allDriverSeasons = [...allDriverSeasons, ...(nextData.results || [])];
         nextUrl = nextData.next;
       }
       
       const teamsMap = new Map<number, string>();
       standings.forEach((standing) => {
         if (standing.driver) {
-          // Find all results for this driver
-          const driverResults = allResults.filter((r: any) => r.driver?.id === standing.driver?.id);
-          if (driverResults.length > 0) {
-            // Sort by race date to get the most recent race
-            const sortedResults = driverResults.sort((a: any, b: any) => {
-              const dateA = new Date(a.race?.date || 0).getTime();
-              const dateB = new Date(b.race?.date || 0).getTime();
-              return dateB - dateA; // Most recent first
-            });
-            
-            // Get the constructor from the most recent race
-            const latestResult = sortedResults[0];
-            if (latestResult.constructor) {
-              teamsMap.set(standing.driver.id, latestResult.constructor.name);
-            }
+          const ds = allDriverSeasons.find(
+            (d: any) => d.driver?.id === standing.driver?.id
+          );
+          if (ds?.constructor?.name) {
+            teamsMap.set(standing.driver.id, ds.constructor.name);
           }
         }
       });

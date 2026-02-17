@@ -42,9 +42,10 @@ export default function RaceDetailPage() {
       setResults(allResults);
 
       // Load qualifying
+      let qualifyingData: Qualifying[] = [];
       try {
         const qualifyingResponse = await f1Api.getQualifying({ race: parseInt(raceId) });
-        const qualifyingData = qualifyingResponse.data.results || qualifyingResponse.data;
+        qualifyingData = qualifyingResponse.data.results || qualifyingResponse.data;
         setQualifying(qualifyingData);
       } catch (err) {
         console.log('No qualifying data available');
@@ -186,7 +187,7 @@ export default function RaceDetailPage() {
               }`}
             >
               <Timer className="w-4 h-4 inline mr-2" />
-              Starting Grid
+              Qualifying
             </button>
           )}
           {hasSprint && (
@@ -255,66 +256,181 @@ export default function RaceDetailPage() {
   );
 }
 
-// Qualifying Section Component
+// Qualifying Section Component — Podium-style layout
 function QualifyingSection({ qualifying }: { qualifying: Qualifying[] }) {
-  return (
-    <div className="bg-gray-900/90 backdrop-blur-sm rounded-xl p-6 border border-gray-700">
-      <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-        <Timer className="w-6 h-6 text-f1-red" />
-        Starting Grid (Qualifying Results)
-      </h2>
+  // Sort by position to ensure correct order
+  const sorted = [...qualifying].sort((a, b) => a.position - b.position);
+  const top3 = sorted.filter(q => q.position <= 3);
+  const rest = sorted.filter(q => q.position > 3);
 
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-gray-700">
-              <th className="text-left py-3 px-4 text-gray-400 font-semibold">Pos</th>
-              <th className="text-left py-3 px-4 text-gray-400 font-semibold">Driver</th>
-              <th className="text-left py-3 px-4 text-gray-400 font-semibold">Team</th>
-              <th className="text-right py-3 px-4 text-gray-400 font-semibold">Q1</th>
-              <th className="text-right py-3 px-4 text-gray-400 font-semibold">Q2</th>
-              <th className="text-right py-3 px-4 text-gray-400 font-semibold">Q3</th>
-            </tr>
-          </thead>
-          <tbody>
-            {qualifying.map((q) => (
-              <tr
-                key={q.id}
-                className="border-b border-gray-800 hover:bg-gray-800/50 transition-colors"
-                style={{
-                  borderLeftWidth: '4px',
-                  borderLeftColor: q.constructor.team_color || '#ef4444',
-                }}
-              >
-                <td className="py-4 px-4">
-                  <span className="font-bold text-white text-lg">
-                    {q.position}
-                  </span>
-                </td>
-                <td className="py-4 px-4">
-                  <div>
-                    <div className="font-semibold text-white">
-                      {q.driver.first_name} {q.driver.last_name}
-                    </div>
-                    <div className="text-sm text-gray-400">{q.driver.code}</div>
-                  </div>
-                </td>
-                <td className="py-4 px-4 text-gray-300">
-                  {q.constructor.name}
-                </td>
-                <td className="py-4 px-4 text-right text-gray-300 font-mono">
-                  {q.q1_time || '-'}
-                </td>
-                <td className="py-4 px-4 text-right text-gray-300 font-mono">
-                  {q.q2_time || '-'}
-                </td>
-                <td className="py-4 px-4 text-right text-gray-300 font-mono">
-                  {q.q3_time || '-'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+  // Arrange top 3: P2 (left), P1 (center), P3 (right)
+  const p1 = top3.find(q => q.position === 1);
+  const p2 = top3.find(q => q.position === 2);
+  const p3 = top3.find(q => q.position === 3);
+
+  // Helper: best time for a qualifying entry (last session completed)
+  const getBestTime = (q: Qualifying) => q.q3_time || q.q2_time || q.q1_time || null;
+
+  return (
+    <div className="space-y-8">
+      {/* Top 3 podium-style cards */}
+      {top3.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+          {/* P2 — Left */}
+          {p2 && (
+            <QualifyingPodiumCard qualifying={p2} bestTime={getBestTime(p2)} />
+          )}
+          {/* P1 — Center, larger */}
+          {p1 && (
+            <QualifyingPodiumCard qualifying={p1} bestTime={getBestTime(p1)} isWinner />
+          )}
+          {/* P3 — Right */}
+          {p3 && (
+            <QualifyingPodiumCard qualifying={p3} bestTime={getBestTime(p3)} />
+          )}
+        </div>
+      )}
+
+      {/* P4+ results table */}
+      {rest.length > 0 && (
+        <div className="bg-gray-900/90 backdrop-blur-sm rounded-xl p-6 border border-gray-700">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+            <Timer className="w-6 h-6 text-f1-red" />
+            Qualifying Results
+          </h2>
+
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-700">
+                  <th className="text-left py-3 px-4 text-gray-400 font-semibold">Pos</th>
+                  <th className="text-left py-3 px-4 text-gray-400 font-semibold">Driver</th>
+                  <th className="text-left py-3 px-4 text-gray-400 font-semibold">Team</th>
+                  <th className="text-right py-3 px-4 text-gray-400 font-semibold">Q1</th>
+                  <th className="text-right py-3 px-4 text-gray-400 font-semibold">Q2</th>
+                  <th className="text-right py-3 px-4 text-gray-400 font-semibold">Q3</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rest.map((q) => (
+                  <tr
+                    key={q.id}
+                    className="border-b border-gray-800 hover:bg-gray-800/50 transition-colors"
+                    style={{
+                      borderLeftWidth: '4px',
+                      borderLeftColor: q.constructor.team_color || '#ef4444',
+                    }}
+                  >
+                    <td className="py-4 px-4">
+                      <span className="font-bold text-white text-lg">
+                        {q.position}
+                      </span>
+                    </td>
+                    <td className="py-4 px-4">
+                      <div>
+                        <div className="font-semibold text-white">
+                          {q.driver.first_name} {q.driver.last_name}
+                        </div>
+                        <div className="text-sm text-gray-400">{q.driver.code}</div>
+                      </div>
+                    </td>
+                    <td className="py-4 px-4 text-gray-300">
+                      {q.constructor.name}
+                    </td>
+                    <td className="py-4 px-4 text-right text-gray-300 font-mono">
+                      {q.q1_time || '-'}
+                    </td>
+                    <td className="py-4 px-4 text-right text-gray-300 font-mono">
+                      {q.q2_time || '-'}
+                    </td>
+                    <td className="py-4 px-4 text-right text-gray-300 font-mono">
+                      {q.q3_time || '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Qualifying Podium Card for top 3
+function QualifyingPodiumCard({ qualifying: q, bestTime, isWinner = false }: { qualifying: Qualifying; bestTime: string | null; isWinner?: boolean }) {
+  const positionStyles: Record<number, { bg: string; border: string; text: string; glow: string }> = {
+    1: {
+      bg: 'from-yellow-500/20 via-yellow-700/10 to-transparent',
+      border: 'border-yellow-400',
+      text: 'text-yellow-400',
+      glow: 'shadow-yellow-400/20 shadow-lg',
+    },
+    2: {
+      bg: 'from-gray-300/20 via-gray-500/10 to-transparent',
+      border: 'border-gray-300',
+      text: 'text-gray-300',
+      glow: '',
+    },
+    3: {
+      bg: 'from-orange-500/20 via-orange-700/10 to-transparent',
+      border: 'border-orange-500',
+      text: 'text-orange-500',
+      glow: '',
+    },
+  };
+
+  const style = positionStyles[q.position] || positionStyles[1];
+  const teamColor = q.constructor.team_color || '#ef4444';
+
+  return (
+    <div
+      className={`relative bg-gradient-to-b ${style.bg} backdrop-blur-sm rounded-xl border-2 ${style.border} ${style.glow} transition-transform hover:scale-[1.03] ${isWinner ? 'md:-mt-6 md:pb-8' : ''}`}
+      style={{ borderLeftWidth: '6px', borderLeftColor: teamColor }}
+    >
+      {/* Position number */}
+      <div className="flex justify-center pt-6 pb-2">
+        <span className={`font-black ${isWinner ? 'text-8xl' : 'text-6xl'} ${style.text} leading-none drop-shadow-lg`}>
+          P{q.position}
+        </span>
+      </div>
+
+      {/* Driver info */}
+      <div className="text-center px-4 pb-2">
+        <h3 className={`font-bold text-white ${isWinner ? 'text-2xl' : 'text-xl'}`}>
+          {q.driver.first_name}
+        </h3>
+        <h3 className={`font-black text-white uppercase ${isWinner ? 'text-3xl' : 'text-2xl'} tracking-wide`}>
+          {q.driver.last_name}
+        </h3>
+        <p className="text-gray-400 font-semibold text-sm mt-1" style={{ color: teamColor }}>
+          {q.constructor.name}
+        </p>
+      </div>
+
+      {/* Best lap time — prominent */}
+      {bestTime && (
+        <div className="text-center mt-3 mb-2">
+          <span className={`font-mono font-bold ${isWinner ? 'text-2xl' : 'text-xl'} text-white`}>
+            {bestTime}
+          </span>
+        </div>
+      )}
+
+      {/* Q1 / Q2 / Q3 breakdown */}
+      <div className="grid grid-cols-3 gap-1 px-4 pb-5 mt-2">
+        <div className="text-center">
+          <div className="text-[10px] uppercase tracking-wider text-gray-500 font-bold">Q1</div>
+          <div className="text-xs font-mono text-gray-300 mt-0.5">{q.q1_time || '-'}</div>
+        </div>
+        <div className="text-center">
+          <div className="text-[10px] uppercase tracking-wider text-gray-500 font-bold">Q2</div>
+          <div className="text-xs font-mono text-gray-300 mt-0.5">{q.q2_time || '-'}</div>
+        </div>
+        <div className="text-center">
+          <div className="text-[10px] uppercase tracking-wider text-gray-500 font-bold">Q3</div>
+          <div className="text-xs font-mono text-gray-300 mt-0.5">{q.q3_time || '-'}</div>
+        </div>
       </div>
     </div>
   );
@@ -392,144 +508,214 @@ function SprintSection({ sprint }: { sprint: Sprint[] }) {
   );
 }
 
-// Race Results Section with Podium Emphasis
+// Race Results Section — Podium-style layout matching Qualifying
 function RaceResultsSection({ results }: { results: Result[] }) {
-  const podium = results.filter(r => r.final_position && r.final_position <= 3);
-  const others = results.filter(r => !r.final_position || r.final_position > 3);
+  // Sort by final_position, DNFs/DSQs/DNS at the end
+  const sorted = [...results].sort((a, b) => {
+    if (a.final_position && b.final_position) return a.final_position - b.final_position;
+    if (a.final_position) return -1;
+    if (b.final_position) return 1;
+    return 0;
+  });
+
+  const top3 = sorted.filter(r => r.final_position && r.final_position <= 3);
+  const rest = sorted.filter(r => !r.final_position || r.final_position > 3);
+
+  // Arrange top 3: P2 (left), P1 (center), P3 (right)
+  const p1 = top3.find(r => r.final_position === 1);
+  const p2 = top3.find(r => r.final_position === 2);
+  const p3 = top3.find(r => r.final_position === 3);
+
+  // Helper: display text for result (points + status)
+  const getResultDisplay = (r: Result) => {
+    if (r.status === 'finished' || r.status === 'dnf' && r.final_position) {
+      return r.points > 0 ? `${r.points} pts` : null;
+    }
+    return null;
+  };
+
+  // Helper: status label for non-finishers
+  const getStatusLabel = (r: Result) => {
+    if (r.status === 'retired' || r.status === 'dnf') return 'DNF';
+    if (r.status === 'dsq') return 'DSQ';
+    if (r.status === 'dns') return 'DNS';
+    return null;
+  };
 
   return (
-    <div className="space-y-6">
-      {/* Podium Section */}
-      {podium.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {podium.map((result) => (
-            <PodiumCard key={result.id} result={result} />
-          ))}
+    <div className="space-y-8">
+      {/* Top 3 podium-style cards */}
+      {top3.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+          {/* P2 — Left */}
+          {p2 && <RacePodiumCard result={p2} />}
+          {/* P1 — Center, larger */}
+          {p1 && <RacePodiumCard result={p1} isWinner />}
+          {/* P3 — Right */}
+          {p3 && <RacePodiumCard result={p3} />}
         </div>
       )}
 
-      {/* Other Results */}
-      <div className="bg-gray-900/90 backdrop-blur-sm rounded-xl p-6 border border-gray-700">
-        <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-          <Flag className="w-6 h-6 text-f1-red" />
-          Full Race Results
-        </h2>
+      {/* P4+ results table */}
+      {rest.length > 0 && (
+        <div className="bg-gray-900/90 backdrop-blur-sm rounded-xl p-6 border border-gray-700">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+            <Flag className="w-6 h-6 text-f1-red" />
+            Race Results
+          </h2>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-700">
-                <th className="text-left py-3 px-4 text-gray-400 font-semibold">Pos</th>
-                <th className="text-left py-3 px-4 text-gray-400 font-semibold">Driver</th>
-                <th className="text-left py-3 px-4 text-gray-400 font-semibold">Team</th>
-                <th className="text-right py-3 px-4 text-gray-400 font-semibold">Points</th>
-              </tr>
-            </thead>
-            <tbody>
-              {others.map((result) => (
-                <ResultRow key={result.id} result={result} />
-              ))}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-700">
+                  <th className="text-left py-3 px-4 text-gray-400 font-semibold">Pos</th>
+                  <th className="text-left py-3 px-4 text-gray-400 font-semibold">Driver</th>
+                  <th className="text-left py-3 px-4 text-gray-400 font-semibold">Team</th>
+                  <th className="text-right py-3 px-4 text-gray-400 font-semibold">Points</th>
+                  <th className="text-right py-3 px-4 text-gray-400 font-semibold">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rest.map((r) => {
+                  const statusLabel = getStatusLabel(r);
+                  const isNotFinished = !!statusLabel;
+
+                  return (
+                    <tr
+                      key={r.id}
+                      className="border-b border-gray-800 hover:bg-gray-800/50 transition-colors"
+                      style={{
+                        borderLeftWidth: '4px',
+                        borderLeftColor: r.constructor.team_color || '#ef4444',
+                      }}
+                    >
+                      <td className="py-4 px-4">
+                        <span className="font-bold text-white text-lg">
+                          {r.position_text}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4">
+                        <div>
+                          <div className="font-semibold text-white">
+                            {r.driver.first_name} {r.driver.last_name}
+                          </div>
+                          <div className="text-sm text-gray-400">{r.driver.code}</div>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 text-gray-300">
+                        {r.constructor.name}
+                      </td>
+                      <td className="py-4 px-4 text-right font-mono text-gray-300">
+                        {r.points > 0 ? (
+                          <span className="text-white font-bold">{r.points}</span>
+                        ) : (
+                          <span className="text-gray-500">0</span>
+                        )}
+                      </td>
+                      <td className="py-4 px-4 text-right">
+                        {isNotFinished ? (
+                          <div className="inline-flex flex-col items-end">
+                            <span className="px-2 py-0.5 bg-red-900/40 text-red-400 rounded text-xs font-bold border border-red-500/30">
+                              {statusLabel}
+                            </span>
+                            {r.retirement_reason && (
+                              <span className="text-xs text-gray-500 mt-0.5">{r.retirement_reason}</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-green-400 text-xs font-semibold">Finished</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
 
-// Podium Card Component
-function PodiumCard({ result }: { result: Result }) {
-  const position = result.final_position || 0;
-  const colors = {
-    1: { bg: 'from-yellow-600/20 to-yellow-900/20', border: 'border-yellow-400', text: 'text-yellow-400', medal: '🥇' },
-    2: { bg: 'from-gray-400/20 to-gray-700/20', border: 'border-gray-300', text: 'text-gray-300', medal: '🥈' },
-    3: { bg: 'from-orange-600/20 to-orange-900/20', border: 'border-orange-600', text: 'text-orange-600', medal: '🥉' },
+// Race Podium Card — mirrors QualifyingPodiumCard exactly
+function RacePodiumCard({ result: r, isWinner = false }: { result: Result; isWinner?: boolean }) {
+  const position = r.final_position || 0;
+
+  const positionStyles: Record<number, { bg: string; border: string; text: string; glow: string }> = {
+    1: {
+      bg: 'from-yellow-500/20 via-yellow-700/10 to-transparent',
+      border: 'border-yellow-400',
+      text: 'text-yellow-400',
+      glow: 'shadow-yellow-400/20 shadow-lg',
+    },
+    2: {
+      bg: 'from-gray-300/20 via-gray-500/10 to-transparent',
+      border: 'border-gray-300',
+      text: 'text-gray-300',
+      glow: '',
+    },
+    3: {
+      bg: 'from-orange-500/20 via-orange-700/10 to-transparent',
+      border: 'border-orange-500',
+      text: 'text-orange-500',
+      glow: '',
+    },
   };
 
-  const style = colors[position as 1 | 2 | 3] || colors[1];
+  const style = positionStyles[position] || positionStyles[1];
+  const teamColor = r.constructor.team_color || '#ef4444';
 
   return (
-    <div 
-      className={`bg-gradient-to-br ${style.bg} backdrop-blur-sm rounded-xl p-6 border-2 ${style.border} transform hover:scale-105 transition-transform`}
-      style={{
-        borderLeftWidth: '6px',
-        borderLeftColor: result.constructor.team_color || '#ef4444',
-      }}
+    <div
+      className={`relative bg-gradient-to-b ${style.bg} backdrop-blur-sm rounded-xl border-2 ${style.border} ${style.glow} transition-transform hover:scale-[1.03] ${isWinner ? 'md:-mt-6 md:pb-8' : ''}`}
+      style={{ borderLeftWidth: '6px', borderLeftColor: teamColor }}
     >
-      <div className="flex items-center justify-between mb-4">
-        <span className={`text-6xl font-bold ${style.text}`}>
+      {/* Position number */}
+      <div className="flex justify-center pt-6 pb-2">
+        <span className={`font-black ${isWinner ? 'text-8xl' : 'text-6xl'} ${style.text} leading-none drop-shadow-lg`}>
           P{position}
         </span>
-        <span className="text-5xl">{style.medal}</span>
       </div>
 
-      <div className="space-y-2">
-        <h3 className="text-2xl font-bold text-white">
-          {result.driver.first_name} {result.driver.last_name}
+      {/* Driver info */}
+      <div className="text-center px-4 pb-2">
+        <h3 className={`font-bold text-white ${isWinner ? 'text-2xl' : 'text-xl'}`}>
+          {r.driver.first_name}
         </h3>
-        <p className="text-gray-300 font-semibold">{result.constructor.name}</p>
-        
-        {result.points > 0 && (
-          <div className="pt-4 border-t border-gray-700">
-            <span className="text-3xl font-bold text-white">{result.points}</span>
-            <span className="text-gray-400 ml-2">points</span>
-          </div>
-        )}
+        <h3 className={`font-black text-white uppercase ${isWinner ? 'text-3xl' : 'text-2xl'} tracking-wide`}>
+          {r.driver.last_name}
+        </h3>
+        <p className="text-gray-400 font-semibold text-sm mt-1" style={{ color: teamColor }}>
+          {r.constructor.name}
+        </p>
+      </div>
 
-        {result.fastest_lap_time && (
-          <div className="text-sm text-gray-400">
-            <Timer className="w-3 h-3 inline mr-1" />
-            Fastest lap: {result.fastest_lap_time}
-          </div>
-        )}
+      {/* Points — prominent */}
+      {r.points > 0 && (
+        <div className="text-center mt-3 mb-2">
+          <span className={`font-mono font-bold ${isWinner ? 'text-2xl' : 'text-xl'} text-white`}>
+            {r.points} pts
+          </span>
+        </div>
+      )}
+
+      {/* Details breakdown: Laps / Fastest Lap / Grid */}
+      <div className="grid grid-cols-3 gap-1 px-4 pb-5 mt-2">
+        <div className="text-center">
+          <div className="text-[10px] uppercase tracking-wider text-gray-500 font-bold">Grid</div>
+          <div className="text-xs font-mono text-gray-300 mt-0.5">P{r.grid_position}</div>
+        </div>
+        <div className="text-center">
+          <div className="text-[10px] uppercase tracking-wider text-gray-500 font-bold">Laps</div>
+          <div className="text-xs font-mono text-gray-300 mt-0.5">{r.laps_completed}</div>
+        </div>
+        <div className="text-center">
+          <div className="text-[10px] uppercase tracking-wider text-gray-500 font-bold">Fastest</div>
+          <div className="text-xs font-mono text-gray-300 mt-0.5">{r.fastest_lap_time || '-'}</div>
+        </div>
       </div>
     </div>
-  );
-}
-
-// Result Row Component
-function ResultRow({ result }: { result: Result }) {
-  let pointsDisplay;
-  if (result.status === 'retired' || result.status.startsWith('retired')) {
-    pointsDisplay = <span className="text-red-400 font-bold">DNF</span>;
-  } else if (result.status === 'dns' || result.status === 'did not start') {
-    pointsDisplay = <span className="text-red-400 font-bold">DNS</span>;
-  } else if (result.points > 0) {
-    pointsDisplay = <span className="text-white font-bold">{result.points}</span>;
-  } else {
-    pointsDisplay = <span className="text-gray-400">0</span>;
-  }
-
-  return (
-    <tr
-      className="border-b border-gray-800 hover:bg-gray-800/50 transition-colors"
-      style={{
-        borderLeftWidth: '4px',
-        borderLeftColor: result.constructor.team_color || '#ef4444',
-      }}
-    >
-      <td className="py-4 px-4">
-        <span className="font-bold text-white text-lg">
-          {result.position_text}
-        </span>
-      </td>
-      <td className="py-4 px-4">
-        <div>
-          <div className="font-semibold text-white">
-            {result.driver.first_name} {result.driver.last_name}
-          </div>
-          <div className="text-sm text-gray-400">{result.driver.code}</div>
-        </div>
-      </td>
-      <td className="py-4 px-4 text-gray-300">
-        {result.constructor.name}
-      </td>
-      <td className="py-4 px-4 text-right">
-        <span className="text-lg">
-          {pointsDisplay}
-        </span>
-      </td>
-    </tr>
   );
 }
 

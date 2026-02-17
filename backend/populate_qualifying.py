@@ -1,67 +1,126 @@
 """
-Populate qualifying data from race results grid positions.
-This creates qualifying entries based on the starting grid positions.
+Populate qualifying data from the Ergast F1 API with real Q1/Q2/Q3 times.
+Fetches actual qualifying session data for each race.
 """
 
 import os
+import sys
 import django
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'f1_analytics.settings')
 django.setup()
 
-from core.models import Race, Result, Qualifying, Driver, Constructor
+from core.models import Race, Result, Qualifying, Driver, Constructor, Season
+from core.services.f1_api_service import F1DataService, F1APIError
 
-def populate_qualifying():
+
+def populate_qualifying(season_year=None):
     """
-    Create qualifying results based on grid positions from race results.
+    Fetch and store real qualifying results (Q1/Q2/Q3 times) from the Ergast API.
+    Works for any season present in the database.
     """
     print("=" * 60)
-    print("POPULATING QUALIFYING DATA")
+    print("POPULATING QUALIFYING DATA FROM API")
     print("=" * 60)
-    
-    races = Race.objects.filter(season=2024).order_by('round')
+
+    service = F1DataService()
+
+    # Determine which seasons to process
+    if season_year:
+        seasons = [season_year]
+    else:
+        seasons = Race.objects.values_list('season', flat=True).distinct().order_by('season')
+
     total_created = 0
+    total_updated = 0
     total_skipped = 0
-    
-    for race in races:
-        print(f"\nRound {race.round}: {race.race_name}")
-        
-        # Check if qualifying already exists
-        existing = Qualifying.objects.filter(race=race).count()
-        if existing > 0:
-            print(f"  ⏭️  Skipping - {existing} qualifying entries already exist")
-            total_skipped += existing
-            continue
-        
-        # Get results ordered by grid position
-        results = Result.objects.filter(race=race).order_by('grid_position')
-        
-        if results.count() == 0:
-            print(f"  ⚠️  No results found")
-            continue
-        
-        created_count = 0
-        for result in results:
-            # Create qualifying entry
-            qualifying = Qualifying.objects.create(
-                race=race,
-                driver=result.driver,
-                constructor=result.constructor,
-                position=result.grid_position,
-                # Note: We don't have actual qualifying times, so we leave them null
-                q1_time=None,
-                q2_time=None,
-                q3_time=None
-            )
-            created_count += 1
-        
-        print(f"  ✅ Created {created_count} qualifying entries")
-        total_created += created_count
-    
+    total_errors = 0
+
+    for season in seasons:
+        print(f"\n{'='*60}")
+        print(f"SEASON {season}")
+        print(f"{'='*60}")
+
+        races = Race.objects.filter(season=season).order_by('round')
+
+        for race in races:
+            print(f"\n  Round {race.round}: {race.race_name}")
+
+            try:
+                # Fetch qualifying data from API
+                api_qualifying = service.fetch_qualifying(season, race.round)
+
+                if not api_qualifying:
+                    print(f"    ⚠️  No qualifying data returned from API")
+                    total_skipped += 1
+                    continue
+
+                race_created = 0
+                race_updated = 0
+
+                for q_data in api_qualifying:
+                    # Extract driver info
+                    driver_info = q_data.get('Driver', {})
+                    driver_id = driver_info.get('driverId', '')
+
+                    # Extract constructor info
+                    constructor_info = q_data.get('Constructor', {})
+                    constructor_id = constructor_info.get('constructorId', '')
+
+                    # Find driver and constructor in DB
+                    try:
+                        driver = Driver.objects.get(driver_id=driver_id)
+                    except Driver.DoesNotExist:
+                        print(f"    ⚠️  Driver not found: {driver_id}")
+                        continue
+
+                    try:
+                        constructor = Constructor.objects.get(constructor_id=constructor_id)
+                    except Constructor.DoesNotExist:
+                        print(f"    ⚠️  Constructor not found: {constructor_id}")
+                        continue
+
+                    # Extract qualifying times
+                    position = int(q_data.get('position', 0))
+                    q1_time = q_data.get('Q1') or None
+                    q2_time = q_data.get('Q2') or None
+                    q3_time = q_data.get('Q3') or None
+
+                    # Create or update qualifying entry
+                    qualifying, created = Qualifying.objects.update_or_create(
+                        race=race,
+                        driver=driver,
+                        defaults={
+                            'constructor': constructor,
+                            'position': position,
+                            'q1_time': q1_time,
+                            'q2_time': q2_time,
+                            'q3_time': q3_time,
+                        }
+                    )
+
+                    if created:
+                        race_created += 1
+                    else:
+                        race_updated += 1
+
+                total_created += race_created
+                total_updated += race_updated
+                print(f"    ✅ Created: {race_created}, Updated: {race_updated}")
+
+            except F1APIError as e:
+                print(f"    ❌ API Error: {e}")
+                total_errors += 1
+            except Exception as e:
+                print(f"    ❌ Error: {e}")
+                total_errors += 1
+
     print("\n" + "=" * 60)
     print(f"SUMMARY")
     print(f"  Created: {total_created}")
-    print(f"  Skipped: {total_skipped}")
+    print(f"  Updated: {total_updated}")
+    print(f"  Skipped (no data): {total_skipped}")
+    print(f"  Errors: {total_errors}")
     print("=" * 60)
 
 
@@ -121,5 +180,7 @@ def add_retirement_reasons():
 
 
 if __name__ == '__main__':
-    populate_qualifying()
+    # Accept optional season year as command-line argument
+    season_arg = int(sys.argv[1]) if len(sys.argv) > 1 else None
+    populate_qualifying(season_year=season_arg)
     add_retirement_reasons()
