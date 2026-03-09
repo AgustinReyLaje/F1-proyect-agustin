@@ -80,14 +80,14 @@ export default function SeasonSelector({ currentSeason, onSeasonChange }: Season
           />
 
           {/* Dropdown */}
-          <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
+          <div className="absolute right-0 mt-2 w-44 max-h-72 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 overflow-y-auto scrollbar-thin">
             <div className="py-1">
               {seasons.map((season) => (
                 <button
                   key={season.id}
                   onClick={() => handleSeasonChange(season.year)}
                   className={`
-                    w-full text-left px-4 py-2.5 text-sm transition-colors
+                    w-full text-left px-3 py-2 text-sm transition-colors
                     hover:bg-gray-100 dark:hover:bg-gray-700
                     ${season.year === currentSeason 
                       ? 'bg-f1-red/10 text-f1-red font-semibold' 
@@ -96,9 +96,9 @@ export default function SeasonSelector({ currentSeason, onSeasonChange }: Season
                   `}
                 >
                   <div className="flex items-center justify-between">
-                    <span>{season.year} Season</span>
+                    <span>{season.year}</span>
                     {season.is_active && (
-                      <span className="px-2 py-0.5 text-xs bg-green-500 text-white rounded-full">
+                      <span className="px-1.5 py-0.5 text-xs bg-green-500 text-white rounded-full">
                         Current
                       </span>
                     )}

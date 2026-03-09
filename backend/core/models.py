@@ -292,6 +292,41 @@ class Sprint(models.Model):
         return f"{self.driver} - {self.race} Sprint - P{self.position_text}"
 
 
+class FreePractice(models.Model):
+    """
+    Represents a Free Practice session result (FP1, FP2, FP3).
+    """
+    SESSION_CHOICES = [
+        ('FP1', 'Free Practice 1'),
+        ('FP2', 'Free Practice 2'),
+        ('FP3', 'Free Practice 3'),
+    ]
+
+    race = models.ForeignKey(Race, on_delete=models.CASCADE, related_name='practice_results')
+    driver = models.ForeignKey(Driver, on_delete=models.CASCADE, related_name='practice_results')
+    constructor = models.ForeignKey(Constructor, on_delete=models.CASCADE, related_name='practice_results')
+
+    session = models.CharField(max_length=3, choices=SESSION_CHOICES, help_text="Practice session (FP1/FP2/FP3)")
+    position = models.IntegerField(help_text="Session classification position")
+    best_lap_time = models.CharField(max_length=20, null=True, blank=True, help_text="Best lap time in format m:ss.SSS")
+    laps = models.IntegerField(default=0, help_text="Number of laps completed in the session")
+    gap_to_leader = models.CharField(max_length=20, null=True, blank=True, help_text="Gap to P1 (e.g. +0.345)")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['race', 'session', 'position']
+        unique_together = ['race', 'driver', 'session']
+        indexes = [
+            models.Index(fields=['race', 'session', 'position']),
+            models.Index(fields=['driver', 'race']),
+        ]
+
+    def __str__(self):
+        return f"{self.driver} - {self.race} {self.session} - P{self.position}"
+
+
 class ChampionshipStanding(models.Model):
     """
     Stores calculated championship standings (can be regenerated from Results).

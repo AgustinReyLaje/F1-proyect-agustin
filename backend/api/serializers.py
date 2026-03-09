@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from core.models import Driver, Constructor, Race, Result, Lap, ChampionshipStanding, Season, ConstructorSeason, DriverSeason, Qualifying, Sprint
+from core.models import Driver, Constructor, Race, Result, Lap, ChampionshipStanding, Season, ConstructorSeason, DriverSeason, Qualifying, Sprint, FreePractice
 from django.db.models import Count, Sum, Min, Max, Q
 from datetime import date
 
@@ -308,6 +308,22 @@ class SprintSerializer(serializers.ModelSerializer):
             'grid_position', 'final_position', 'position_text',
             'points', 'laps_completed', 'status', 'retirement_reason',
             'fastest_lap_time',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+
+
+class FreePracticeSerializer(serializers.ModelSerializer):
+    driver = DriverSerializer(read_only=True)
+    constructor = ConstructorSerializer(read_only=True)
+    race = RaceSerializer(read_only=True)
+    
+    class Meta:
+        model = FreePractice
+        fields = [
+            'id', 'race', 'driver', 'constructor',
+            'session', 'position', 'best_lap_time',
+            'laps', 'gap_to_leader',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']

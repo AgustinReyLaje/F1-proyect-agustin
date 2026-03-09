@@ -188,6 +188,20 @@ export interface Sprint {
   updated_at: string;
 }
 
+export interface FreePractice {
+  id: number;
+  race: Race;
+  driver: Driver;
+  constructor: Constructor;
+  session: 'FP1' | 'FP2' | 'FP3';
+  position: number;
+  best_lap_time: string | null;
+  laps: number;
+  gap_to_leader: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ProgressiveStanding {
   position: number;
   driver: {

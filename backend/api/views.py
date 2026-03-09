@@ -6,13 +6,14 @@ from django.db.models import Sum, Count, Q
 from core.models import (
     Driver, Constructor, Race, Result, Lap, 
     ChampionshipStanding, ConstructorSeason, DriverSeason,
-    Qualifying, Sprint, Season
+    Qualifying, Sprint, Season, FreePractice
 )
 from .serializers import (
     DriverSerializer, ConstructorSerializer, RaceSerializer, 
     ResultSerializer, LapSerializer, ChampionshipStandingSerializer,
     ConstructorSeasonSerializer, DriverSeasonSerializer,
-    QualifyingSerializer, SprintSerializer, SeasonSerializer
+    QualifyingSerializer, SprintSerializer, SeasonSerializer,
+    FreePracticeSerializer
 )
 
 
@@ -55,14 +56,28 @@ class DriverSeasonViewSet(viewsets.ReadOnlyModelViewSet):
 class ConstructorViewSet(viewsets.ReadOnlyModelViewSet):
     """
     API endpoint for viewing constructors.
+    When ?season=YYYY is provided, returns only constructors that participated in that season.
     """
-    queryset = Constructor.objects.all()
     serializer_class = ConstructorSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['nationality']
     search_fields = ['name', 'constructor_id']
     ordering_fields = ['name']
     ordering = ['name']
+
+    def get_queryset(self):
+        queryset = Constructor.objects.all()
+        season = self.request.query_params.get('season')
+        if season:
+            try:
+                season_year = int(season)
+                # Only return constructors that have results in this season
+                queryset = queryset.filter(
+                    results__race__season=season_year
+                ).distinct()
+            except (ValueError, TypeError):
+                pass
+        return queryset
 
 
 class ConstructorSeasonViewSet(viewsets.ReadOnlyModelViewSet):
@@ -247,4 +262,17 @@ class SprintViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_fields = ['race__season', 'race', 'driver', 'constructor', 'status']
     ordering_fields = ['final_position', 'points']
     ordering = ['race', 'final_position']
+
+
+class FreePracticeViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    API endpoint for viewing free practice session results (FP1, FP2, FP3).
+    Filter by race, session, driver, constructor, or season.
+    """
+    queryset = FreePractice.objects.select_related('race', 'driver', 'constructor').all()
+    serializer_class = FreePracticeSerializer
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['race__season', 'race', 'driver', 'constructor', 'session']
+    ordering_fields = ['position', 'session']
+    ordering = ['race', 'session', 'position']
 

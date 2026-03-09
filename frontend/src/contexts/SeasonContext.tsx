@@ -10,7 +10,7 @@ interface SeasonContextType {
 const SeasonContext = createContext<SeasonContextType | undefined>(undefined);
 
 export function SeasonProvider({ children }: { children: ReactNode }) {
-  const [currentSeason, setCurrentSeason] = useState<number>(2024);
+  const [currentSeason, setCurrentSeason] = useState<number>(2026);
 
   useEffect(() => {
     // Try to load from localStorage

@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { f1Api } from '@/lib/api';
-import { Race, Result, Qualifying, Sprint, ProgressiveStandingsResponse } from '@/types/f1';
-import { ArrowLeft, Calendar, MapPin, Loader2, Trophy, Timer, Flag, AlertCircle } from 'lucide-react';
+import { Race, Result, Qualifying, Sprint, FreePractice, ProgressiveStandingsResponse } from '@/types/f1';
+import { ArrowLeft, Calendar, MapPin, Loader2, Trophy, Timer, Flag, AlertCircle, Activity } from 'lucide-react';
 
 export default function RaceDetailPage() {
   const params = useParams();
@@ -16,10 +16,11 @@ export default function RaceDetailPage() {
   const [results, setResults] = useState<Result[]>([]);
   const [qualifying, setQualifying] = useState<Qualifying[]>([]);
   const [sprint, setSprint] = useState<Sprint[]>([]);
+  const [freePractice, setFreePractice] = useState<FreePractice[]>([]);
   const [progressiveStandings, setProgressiveStandings] = useState<ProgressiveStandingsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'qualifying' | 'sprint' | 'race' | 'standings'>('race');
+  const [activeTab, setActiveTab] = useState<'fp1' | 'fp2' | 'fp3' | 'qualifying' | 'sprint' | 'race' | 'standings'>('race');
   const [showAllStandings, setShowAllStandings] = useState(false);
 
   useEffect(() => {
@@ -60,6 +61,16 @@ export default function RaceDetailPage() {
       } catch (err) {
         console.log('No sprint data available');
         setSprint([]);
+      }
+
+      // Load free practice sessions
+      try {
+        const fpResponse = await f1Api.getFreePractice({ race: parseInt(raceId) });
+        const fpData = fpResponse.data.results || fpResponse.data;
+        setFreePractice(fpData);
+      } catch (err) {
+        console.log('No free practice data available');
+        setFreePractice([]);
       }
 
       // Load progressive standings
@@ -115,6 +126,12 @@ export default function RaceDetailPage() {
   const raceDate = new Date(race.date);
   const hasSprint = sprint.length > 0;
   const hasQualifying = qualifying.length > 0;
+  const hasFP1 = freePractice.some(fp => fp.session === 'FP1');
+  const hasFP2 = freePractice.some(fp => fp.session === 'FP2');
+  const hasFP3 = freePractice.some(fp => fp.session === 'FP3');
+  const fp1Data = freePractice.filter(fp => fp.session === 'FP1').sort((a, b) => a.position - b.position);
+  const fp2Data = freePractice.filter(fp => fp.session === 'FP2').sort((a, b) => a.position - b.position);
+  const fp3Data = freePractice.filter(fp => fp.session === 'FP3').sort((a, b) => a.position - b.position);
 
   return (
     <div className="relative min-h-screen">
@@ -177,6 +194,45 @@ export default function RaceDetailPage() {
 
         {/* Tabs Navigation */}
         <div className="mt-8 mb-8 py-4 flex gap-2 overflow-x-auto pb-2">
+          {hasFP1 && (
+            <button
+              onClick={() => setActiveTab('fp1')}
+              className={`px-6 py-3 rounded-lg font-semibold transition-all whitespace-nowrap ${
+                activeTab === 'fp1'
+                  ? 'bg-f1-red text-white'
+                  : 'bg-gray-800/80 text-gray-300 hover:bg-gray-700/80'
+              }`}
+            >
+              <Activity className="w-4 h-4 inline mr-2" />
+              FP1
+            </button>
+          )}
+          {hasFP2 && (
+            <button
+              onClick={() => setActiveTab('fp2')}
+              className={`px-6 py-3 rounded-lg font-semibold transition-all whitespace-nowrap ${
+                activeTab === 'fp2'
+                  ? 'bg-f1-red text-white'
+                  : 'bg-gray-800/80 text-gray-300 hover:bg-gray-700/80'
+              }`}
+            >
+              <Activity className="w-4 h-4 inline mr-2" />
+              FP2
+            </button>
+          )}
+          {hasFP3 && (
+            <button
+              onClick={() => setActiveTab('fp3')}
+              className={`px-6 py-3 rounded-lg font-semibold transition-all whitespace-nowrap ${
+                activeTab === 'fp3'
+                  ? 'bg-f1-red text-white'
+                  : 'bg-gray-800/80 text-gray-300 hover:bg-gray-700/80'
+              }`}
+            >
+              <Activity className="w-4 h-4 inline mr-2" />
+              FP3
+            </button>
+          )}
           {hasQualifying && (
             <button
               onClick={() => setActiveTab('qualifying')}
@@ -231,6 +287,18 @@ export default function RaceDetailPage() {
 
         {/* Tab Content */}
         <div className="space-y-6">
+          {activeTab === 'fp1' && hasFP1 && (
+            <FreePracticeSection session="FP1" data={fp1Data} />
+          )}
+
+          {activeTab === 'fp2' && hasFP2 && (
+            <FreePracticeSection session="FP2" data={fp2Data} />
+          )}
+
+          {activeTab === 'fp3' && hasFP3 && (
+            <FreePracticeSection session="FP3" data={fp3Data} />
+          )}
+
           {activeTab === 'qualifying' && hasQualifying && (
             <QualifyingSection qualifying={qualifying} />
           )}
@@ -252,6 +320,159 @@ export default function RaceDetailPage() {
           )}
         </div>
       </main>
+    </div>
+  );
+}
+
+// Free Practice Section Component
+function FreePracticeSection({ session, data }: { session: string; data: FreePractice[] }) {
+  const top3 = data.filter(fp => fp.position <= 3);
+  const rest = data.filter(fp => fp.position > 3);
+
+  const p1 = top3.find(fp => fp.position === 1);
+  const p2 = top3.find(fp => fp.position === 2);
+  const p3 = top3.find(fp => fp.position === 3);
+
+  return (
+    <div className="space-y-8">
+      {/* Top 3 podium-style cards */}
+      {top3.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+          {p2 && <FPPodiumCard fp={p2} />}
+          {p1 && <FPPodiumCard fp={p1} isWinner />}
+          {p3 && <FPPodiumCard fp={p3} />}
+        </div>
+      )}
+
+      {/* P4+ results table */}
+      {rest.length > 0 && (
+        <div className="bg-gray-900/90 backdrop-blur-sm rounded-xl p-6 border border-gray-700">
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+            <Activity className="w-6 h-6 text-f1-red" />
+            {session} Results
+          </h2>
+
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-700">
+                  <th className="text-left py-3 px-4 text-gray-400 font-semibold">Pos</th>
+                  <th className="text-left py-3 px-4 text-gray-400 font-semibold">Driver</th>
+                  <th className="text-left py-3 px-4 text-gray-400 font-semibold">Team</th>
+                  <th className="text-right py-3 px-4 text-gray-400 font-semibold">Best Lap</th>
+                  <th className="text-right py-3 px-4 text-gray-400 font-semibold">Gap</th>
+                  <th className="text-right py-3 px-4 text-gray-400 font-semibold">Laps</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rest.map((fp) => (
+                  <tr
+                    key={fp.id}
+                    className="border-b border-gray-800 hover:bg-gray-800/50 transition-colors"
+                    style={{
+                      borderLeftWidth: '4px',
+                      borderLeftColor: fp.constructor.team_color || '#ef4444',
+                    }}
+                  >
+                    <td className="py-4 px-4">
+                      <span className="font-bold text-white text-lg">{fp.position}</span>
+                    </td>
+                    <td className="py-4 px-4">
+                      <div>
+                        <div className="font-semibold text-white">
+                          {fp.driver.first_name} {fp.driver.last_name}
+                        </div>
+                        <div className="text-sm text-gray-400">{fp.driver.code}</div>
+                      </div>
+                    </td>
+                    <td className="py-4 px-4 text-gray-300">{fp.constructor.name}</td>
+                    <td className="py-4 px-4 text-right text-gray-300 font-mono">
+                      {fp.best_lap_time || '-'}
+                    </td>
+                    <td className="py-4 px-4 text-right text-gray-300 font-mono">
+                      {fp.gap_to_leader || '-'}
+                    </td>
+                    <td className="py-4 px-4 text-right text-gray-300">
+                      {fp.laps}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// FP Podium Card — mirrors QualifyingPodiumCard
+function FPPodiumCard({ fp, isWinner = false }: { fp: FreePractice; isWinner?: boolean }) {
+  const positionStyles: Record<number, { bg: string; border: string; text: string; glow: string }> = {
+    1: {
+      bg: 'from-yellow-500/20 via-yellow-700/10 to-transparent',
+      border: 'border-yellow-400',
+      text: 'text-yellow-400',
+      glow: 'shadow-yellow-400/20 shadow-lg',
+    },
+    2: {
+      bg: 'from-gray-300/20 via-gray-500/10 to-transparent',
+      border: 'border-gray-300',
+      text: 'text-gray-300',
+      glow: '',
+    },
+    3: {
+      bg: 'from-orange-500/20 via-orange-700/10 to-transparent',
+      border: 'border-orange-500',
+      text: 'text-orange-500',
+      glow: '',
+    },
+  };
+
+  const style = positionStyles[fp.position] || positionStyles[1];
+  const teamColor = fp.constructor.team_color || '#ef4444';
+
+  return (
+    <div
+      className={`relative bg-gradient-to-b ${style.bg} backdrop-blur-sm rounded-xl border-2 ${style.border} ${style.glow} transition-transform hover:scale-[1.03] ${isWinner ? 'md:-mt-6 md:pb-8' : ''}`}
+      style={{ borderLeftWidth: '6px', borderLeftColor: teamColor }}
+    >
+      <div className="flex justify-center pt-6 pb-2">
+        <span className={`font-black ${isWinner ? 'text-8xl' : 'text-6xl'} ${style.text} leading-none drop-shadow-lg`}>
+          P{fp.position}
+        </span>
+      </div>
+
+      <div className="text-center px-4 pb-2">
+        <h3 className={`font-bold text-white ${isWinner ? 'text-2xl' : 'text-xl'}`}>
+          {fp.driver.first_name}
+        </h3>
+        <h3 className={`font-black text-white uppercase ${isWinner ? 'text-3xl' : 'text-2xl'} tracking-wide`}>
+          {fp.driver.last_name}
+        </h3>
+        <p className="text-gray-400 font-semibold text-sm mt-1" style={{ color: teamColor }}>
+          {fp.constructor.name}
+        </p>
+      </div>
+
+      {fp.best_lap_time && (
+        <div className="text-center mt-3 mb-2">
+          <span className={`font-mono font-bold ${isWinner ? 'text-2xl' : 'text-xl'} text-white`}>
+            {fp.best_lap_time}
+          </span>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-1 px-4 pb-5 mt-2">
+        <div className="text-center">
+          <div className="text-[10px] uppercase tracking-wider text-gray-500 font-bold">Laps</div>
+          <div className="text-xs font-mono text-gray-300 mt-0.5">{fp.laps}</div>
+        </div>
+        <div className="text-center">
+          <div className="text-[10px] uppercase tracking-wider text-gray-500 font-bold">Gap</div>
+          <div className="text-xs font-mono text-gray-300 mt-0.5">{fp.gap_to_leader || '-'}</div>
+        </div>
+      </div>
     </div>
   );
 }

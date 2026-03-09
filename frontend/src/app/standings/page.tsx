@@ -9,6 +9,20 @@ import { useSeason } from '@/contexts/SeasonContext';
 
 type StandingType = 'driver' | 'constructor';
 
+// Team logo mapping for 2024/2025 seasons
+const TEAM_LOGOS: Record<string, string> = {
+  'Red Bull': '/images/teams/2024Season/Oracle_Red_Bull_Racing.png',
+  'Ferrari': '/images/teams/2024Season/Ferrari_Scuderia_Logo.png',
+  'McLaren': '/images/teams/2024Season/McLaren_Racing_logo.png',
+  'Mercedes': '/images/teams/2024Season/Mercedes_AMG_Petronas_logo.png',
+  'Aston Martin': '/images/teams/2024Season/Aston_Martin_F1_Team_logo_2024.png',
+  'Alpine F1 Team': '/images/teams/2024Season/Logo_of_alpine_f1_team_2024.png',
+  'Williams': '/images/teams/2024Season/Logo_Williams_F1.png',
+  'RB F1 Team': '/images/teams/2024Season/RB-Racing_Bulls_Logo.png',
+  'Haas F1 Team': '/images/teams/2024Season/Logo_Haas_F1.png',
+  'Sauber': '/images/teams/2024Season/Logo_of_Stake_F1_Team_Kick_Sauber.png',
+};
+
 export default function StandingsPage() {
   const [standings, setStandings] = useState<ChampionshipStanding[]>([]);
   const [loading, setLoading] = useState(true);
@@ -248,11 +262,11 @@ export default function StandingsPage() {
                               </div>
                             ) : (
                               <div className="flex items-center gap-3">
-                                {standing.constructor?.car_image_url && (
+                                {standing.constructor?.name && TEAM_LOGOS[standing.constructor.name] && (
                                   <img
-                                    src={standing.constructor.car_image_url}
+                                    src={TEAM_LOGOS[standing.constructor.name]}
                                     alt={`${standing.constructor.name} logo`}
-                                    className="w-12 h-12 object-contain"
+                                    className="w-10 h-10 object-contain"
                                     onError={(e) => {
                                       e.currentTarget.style.display = 'none';
                                     }}

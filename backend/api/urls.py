@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     SeasonViewSet, DriverViewSet, DriverSeasonViewSet, ConstructorViewSet, ConstructorSeasonViewSet,
     RaceViewSet, ResultViewSet, LapViewSet, ChampionshipStandingViewSet,
-    QualifyingViewSet, SprintViewSet
+    QualifyingViewSet, SprintViewSet, FreePracticeViewSet
 )
 
 router = DefaultRouter()
@@ -18,6 +18,7 @@ router.register(r'laps', LapViewSet, basename='lap')
 router.register(r'standings', ChampionshipStandingViewSet, basename='standing')
 router.register(r'qualifying', QualifyingViewSet, basename='qualifying')
 router.register(r'sprint', SprintViewSet, basename='sprint')
+router.register(r'free-practice', FreePracticeViewSet, basename='free-practice')
 
 urlpatterns = [
     path('', include(router.urls)),

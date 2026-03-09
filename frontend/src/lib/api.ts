@@ -115,6 +115,10 @@ export const f1Api = {
   getSprint: (params?: { race__season?: number; race?: number; driver?: number }) =>
     api.get('/sprint/', { params }),
 
+  // Free Practice
+  getFreePractice: (params?: { race__season?: number; race?: number; driver?: number; session?: string }) =>
+    api.get('/free-practice/', { params }),
+
   // Laps
   getLaps: (params?: { race?: number; driver?: number }) =>
     api.get('/laps/', { params }),

@@ -262,6 +262,26 @@ class F1DataService:
         except KeyError:
             return []
     
+    def fetch_free_practice(self, season: int, round_number: int, session: int = 1) -> List[Dict]:
+        """
+        Fetch free practice results for a specific race session.
+        
+        The Ergast API doesn't have a dedicated FP endpoint, so we use the
+        race schedule which includes FirstPractice, SecondPractice, ThirdPractice dates.
+        For actual FP results, we'll store them when available from the import process.
+        
+        Args:
+            season: Year of the season
+            round_number: Round number of the race
+            session: Session number (1=FP1, 2=FP2, 3=FP3)
+            
+        Returns:
+            List of practice result dictionaries
+        """
+        # Ergast compatible mirrors don't have dedicated FP results endpoints
+        # FP data will be populated via import scripts using alternative sources
+        return []
+    
     def fetch_constructor_standings(self, season: int, round_number: Optional[int] = None) -> List[Dict]:
         """
         Fetch constructor championship standings.
