@@ -1,52 +1,29 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { Constructor } from '@/types/f1';
 import TeamCardHoverInfo from './TeamCardHoverInfo';
 import TeamDriversList from './TeamDriversList';
 
 interface TeamCardProps {
   constructor: Constructor;
-  currentSeason: number;
+  currentSeason?: number;
 }
 
-// Mapping of team names to car image filenames for 2026 season
-const TEAM_CAR_IMAGES: Record<string, string> = {
-  'Ferrari': '/images/cars/2026-season/ferrari.png',
-  'Red Bull': '/images/cars/2026-season/red-bull.png',
-  'McLaren': '/images/cars/2026-season/mclaren.png',
-  'Mercedes': '/images/cars/2026-season/mercedes.png',
-  'Aston Martin': '/images/cars/2026-season/aston-martin.png',
-  'Alpine F1 Team': '/images/cars/2026-season/alpine.png',
-  'Williams': '/images/cars/2026-season/williams.png',
-  'Haas F1 Team': '/images/cars/2026-season/haas.png',
-  'RB F1 Team': '/images/cars/2026-season/rb.png',
-  'Sauber': '/images/cars/2026-season/sauber.png',
-};
-
-function getCarImage(constructor: Constructor): string | null {
-  // Try constructor's own car_image_url first
-  if (constructor.car_image_url) return constructor.car_image_url;
-  // Then try our local mapping
-  return TEAM_CAR_IMAGES[constructor.name] || null;
-}
-
-const loadedTeamImages = new Set<string>();
+const loadedImages = new Set<string>();
 
 function preloadImage(url: string) {
-  if (loadedTeamImages.has(url)) return;
+  if (loadedImages.has(url)) return;
   const img = new Image();
   img.src = url;
-  loadedTeamImages.add(url);
+  loadedImages.add(url);
 }
 
-export default function TeamCard({ constructor, currentSeason }: TeamCardProps) {
+function TeamCard({ constructor }: TeamCardProps) {
   const [isHovered, setIsHovered] = useState(false);
 
-  // Team colors with fallback
   const primaryColor = constructor.team_color || '#DC0000';
-  const secondaryColor = constructor.team_color_secondary || '#1a1a1a';
-  const carImage = currentSeason === 2026 ? getCarImage(constructor) : null;
+  const carImage = constructor.car_image_url ?? null;
 
   useEffect(() => {
     if (carImage) preloadImage(carImage);
@@ -60,11 +37,12 @@ export default function TeamCard({ constructor, currentSeason }: TeamCardProps) 
         group cursor-pointer
         ${isHovered ? 'scale-[1.03] z-20' : 'scale-100 z-10'}
       `}
-      style={{ 
+      style={{
         borderLeft: `4px solid ${primaryColor}`,
         boxShadow: isHovered
           ? `0 0 40px ${primaryColor}30, 0 20px 50px rgba(0,0,0,0.5)`
           : `0 4px 20px rgba(0,0,0,0.3)`,
+        willChange: 'transform',
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -72,53 +50,41 @@ export default function TeamCard({ constructor, currentSeason }: TeamCardProps) 
       tabIndex={0}
       aria-label={`${constructor.name} team information`}
     >
-      {/* Background Image Layer — 2026 car visuals only */}
+      {/* Background Image Layer */}
       <div className="absolute inset-0 z-0">
         {/* Car Image Background */}
         {carImage && (
           <div
             className={`
-              absolute inset-0 bg-cover bg-center bg-no-repeat
+              absolute inset-0 bg-no-repeat
               transition-all duration-700
-              ${isHovered ? 'scale-110 opacity-80' : 'scale-100 opacity-55'}
+              ${isHovered ? 'scale-110 opacity-95' : 'scale-100 opacity-80'}
             `}
             style={{
               backgroundImage: `url(${carImage})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
-              filter: isHovered ? 'blur(0px)' : 'blur(1px)',
+              backgroundSize: '105%',
+              backgroundPosition: 'center 40%',
             }}
             aria-hidden="true"
           />
         )}
 
         {/* Dark overlay with team color accent — always present */}
-        <div 
+        <div
           className="absolute inset-0 z-10 transition-all duration-500"
           style={{
-            background: `linear-gradient(135deg, ${primaryColor}26 0%, rgba(0,0,0,0.46) 40%, rgba(0,0,0,0.62) 100%)`,
+            background: `linear-gradient(135deg, ${primaryColor}40 0%, rgba(0,0,0,0.28) 40%, rgba(0,0,0,0.48) 100%)`,
           }}
         />
 
         {/* Team color glow at bottom */}
-        <div 
+        <div
           className="absolute bottom-0 left-0 right-0 h-1 z-20 transition-all duration-500"
           style={{
             background: `linear-gradient(90deg, transparent, ${primaryColor}, transparent)`,
             opacity: isHovered ? 1 : 0.5,
             boxShadow: isHovered ? `0 0 20px ${primaryColor}60` : 'none',
           }}
-        />
-
-        {/* Glassmorphism effect on hover */}
-        <div 
-          className={`
-            absolute inset-0 z-30
-            backdrop-blur-[0.5px]
-            transition-opacity duration-500
-            ${isHovered ? 'opacity-20' : 'opacity-0'}
-          `}
         />
       </div>
 
@@ -206,3 +172,5 @@ export default function TeamCard({ constructor, currentSeason }: TeamCardProps) 
     </article>
   );
 }
+
+export default memo(TeamCard);

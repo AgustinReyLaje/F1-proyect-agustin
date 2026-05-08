@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { f1Api } from '@/lib/api';
 import { Constructor } from '@/types/f1';
@@ -15,16 +15,11 @@ export default function ConstructorsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const { currentSeason } = useSeason();
 
-  useEffect(() => {
-    loadConstructors();
-  }, [currentSeason]);
-
-  const loadConstructors = async () => {
+  const loadConstructors = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const response = await f1Api.getConstructors({ season: currentSeason });
-      // Handle paginated response
       const data = response.data.results || response.data;
       setConstructors(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -33,12 +28,20 @@ export default function ConstructorsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentSeason]);
 
-  const filteredConstructors = constructors.filter((constructor) =>
-    searchTerm === '' ||
-    constructor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    constructor.nationality.toLowerCase().includes(searchTerm.toLowerCase())
+  useEffect(() => {
+    loadConstructors();
+  }, [loadConstructors]);
+
+  const filteredConstructors = useMemo(() =>
+    searchTerm === ''
+      ? constructors
+      : constructors.filter((constructor) =>
+          constructor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          constructor.nationality.toLowerCase().includes(searchTerm.toLowerCase())
+        ),
+    [constructors, searchTerm]
   );
 
   return (
