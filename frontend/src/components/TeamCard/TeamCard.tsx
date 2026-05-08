@@ -7,46 +7,23 @@ import TeamDriversList from './TeamDriversList';
 
 interface TeamCardProps {
   constructor: Constructor;
-  currentSeason: number;
+  currentSeason?: number;
 }
 
-// Mapping of team names to car image filenames for 2026 season
-const TEAM_CAR_IMAGES: Record<string, string> = {
-  'Ferrari': '/images/cars/2026-season/ferrari.png',
-  'Red Bull': '/images/cars/2026-season/red-bull.png',
-  'McLaren': '/images/cars/2026-season/mclaren.png',
-  'Mercedes': '/images/cars/2026-season/mercedes.png',
-  'Aston Martin': '/images/cars/2026-season/aston-martin.png',
-  'Alpine F1 Team': '/images/cars/2026-season/alpine.png',
-  'Williams': '/images/cars/2026-season/williams.png',
-  'Haas F1 Team': '/images/cars/2026-season/haas.png',
-  'RB F1 Team': '/images/cars/2026-season/rb.png',
-  'Sauber': '/images/cars/2026-season/sauber.png',
-};
-
-function getCarImage(constructor: Constructor): string | null {
-  // Try constructor's own car_image_url first
-  if (constructor.car_image_url) return constructor.car_image_url;
-  // Then try our local mapping
-  return TEAM_CAR_IMAGES[constructor.name] || null;
-}
-
-const loadedTeamImages = new Set<string>();
+const loadedImages = new Set<string>();
 
 function preloadImage(url: string) {
-  if (loadedTeamImages.has(url)) return;
+  if (loadedImages.has(url)) return;
   const img = new Image();
   img.src = url;
-  loadedTeamImages.add(url);
+  loadedImages.add(url);
 }
 
-function TeamCard({ constructor, currentSeason }: TeamCardProps) {
+function TeamCard({ constructor }: TeamCardProps) {
   const [isHovered, setIsHovered] = useState(false);
 
-  // Team colors with fallback
   const primaryColor = constructor.team_color || '#DC0000';
-  const secondaryColor = constructor.team_color_secondary || '#1a1a1a';
-  const carImage = currentSeason === 2026 ? getCarImage(constructor) : null;
+  const carImage = constructor.car_image_url ?? null;
 
   useEffect(() => {
     if (carImage) preloadImage(carImage);
@@ -73,7 +50,7 @@ function TeamCard({ constructor, currentSeason }: TeamCardProps) {
       tabIndex={0}
       aria-label={`${constructor.name} team information`}
     >
-      {/* Background Image Layer — 2026 car visuals only */}
+      {/* Background Image Layer */}
       <div className="absolute inset-0 z-0">
         {/* Car Image Background */}
         {carImage && (
