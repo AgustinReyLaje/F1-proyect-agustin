@@ -69,8 +69,8 @@ export const f1Api = {
     api.get(`/drivers/${id}/`),
 
   // Driver Seasons (with team data, colors, and career stats)
-  getDriverSeasons: (params?: { season__year?: number; driver?: number; constructor?: number }) =>
-    api.get('/driver-seasons/', { params }),
+  getDriverSeasons: (params?: { season__year?: number; driver?: number; constructorId?: number }) =>
+    api.get('/driver-seasons/', { params: params ? { ...params, constructor: params.constructorId } : params }),
   
   getDriverSeason: (id: number) =>
     api.get(`/driver-seasons/${id}/`),

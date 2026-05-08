@@ -14,7 +14,7 @@ Imports ALL data from the Ergast API (jolpi.ca mirror):
   - Championship Standings (calculated from results)
 
 Usage:
-    python import_all_seasons.py                  # Import all 2000-2025
+    python import_all_seasons.py                  # Import all 2000-2026
     python import_all_seasons.py 2005             # Import single season
     python import_all_seasons.py 2010 2015        # Import range
     python import_all_seasons.py --skip-existing   # Skip seasons already in DB
@@ -29,7 +29,7 @@ import django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'f1_analytics.settings')
 django.setup()
 
-from datetime import datetime
+from datetime import datetime, date
 from django.db import transaction
 from django.db.models import Q
 from core.models import (
@@ -187,6 +187,7 @@ def get_retirement_reason(status_text: str) -> str:
 class MultiSeasonImporter:
     def __init__(self):
         self.service = F1DataService()
+        self.season_constructors = {}
         self.stats = {
             'seasons_created': 0,
             'drivers_created': 0,
@@ -256,14 +257,14 @@ class MultiSeasonImporter:
             created_count = 0
             for d in drivers_data:
                 _, created = Driver.objects.update_or_create(
-                    driver_id=d['driverId'],
+                    driver_id=d.get('driverId', ''),
                     defaults={
                         'number': d.get('permanentNumber'),
                         'code': d.get('code', ''),
-                        'first_name': d['givenName'],
-                        'last_name': d['familyName'],
+                        'first_name': d.get('givenName', ''),
+                        'last_name': d.get('familyName', ''),
                         'date_of_birth': d.get('dateOfBirth'),
-                        'nationality': d['nationality'],
+                        'nationality': d.get('nationality', ''),
                         'url': d.get('url', ''),
                     }
                 )
@@ -280,15 +281,16 @@ class MultiSeasonImporter:
         print(f"  🏭 Importing constructors for {year}...")
         try:
             constructors_data = self.service.fetch_constructors(year)
+            self.season_constructors[year] = constructors_data
             created_count = 0
             for c in constructors_data:
                 # Set team colors from our color dictionary
-                colors = TEAM_COLORS.get(c['constructorId'], {})
+                colors = TEAM_COLORS.get(c.get('constructorId', ''), {})
                 _, created = Constructor.objects.update_or_create(
-                    constructor_id=c['constructorId'],
+                    constructor_id=c.get('constructorId', ''),
                     defaults={
-                        'name': c['name'],
-                        'nationality': c['nationality'],
+                        'name': c.get('name', ''),
+                        'nationality': c.get('nationality', ''),
                         'url': c.get('url', ''),
                         'team_color': colors.get('color'),
                         'team_color_secondary': colors.get('secondary'),
@@ -313,8 +315,19 @@ class MultiSeasonImporter:
             return []
         
         race_objects = []
+        skipped_future = 0
+        today = date.today()
         for race_data in races_data:
             try:
+                if year == today.year:
+                    try:
+                        race_date = datetime.strptime(race_data['date'], '%Y-%m-%d').date()
+                        if race_date > today:
+                            skipped_future += 1
+                            continue
+                    except (KeyError, ValueError):
+                        pass
+
                 race = self._import_single_race(race_data, year)
                 race_objects.append(race)
                 
@@ -332,6 +345,8 @@ class MultiSeasonImporter:
                 print(f"     ✗ Error on round {race_data.get('round', '?')}: {e}")
                 self.stats['errors'].append(f"Race {year} R{race_data.get('round', '?')}: {e}")
         
+        if skipped_future:
+            print(f"     = Skipped {skipped_future} future races beyond {today.isoformat()}")
         print(f"     ✓ {len(race_objects)} races processed")
         return race_objects
     
@@ -575,14 +590,19 @@ class MultiSeasonImporter:
     def _create_constructor_seasons(self, year: int, season_obj: Season):
         """Create ConstructorSeason entries with team colors and car models."""
         print(f"  🏎️  Creating ConstructorSeason entries for {year}...")
-        
-        constructors_in_season = Result.objects.filter(
-            race__season=year
-        ).values_list('constructor', flat=True).distinct()
+
+        constructors_data = self.season_constructors.get(year, [])
+        if not constructors_data:
+            constructors_data = self.service.fetch_constructors(year)
+            self.season_constructors[year] = constructors_data
         
         created_count = 0
-        for constructor_id in constructors_in_season:
-            constructor = Constructor.objects.get(id=constructor_id)
+        for constructor_data in constructors_data:
+            constructor_id = constructor_data.get('constructorId', '')
+            try:
+                constructor = Constructor.objects.get(constructor_id=constructor_id)
+            except Constructor.DoesNotExist:
+                continue
             
             colors = TEAM_COLORS.get(constructor.constructor_id, {})
             car_models = CAR_MODELS.get(constructor.constructor_id, {})

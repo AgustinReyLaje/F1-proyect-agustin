@@ -1,4 +1,3 @@
-# F1 Analytics Platform - Dockerfile
 FROM python:3.11-slim
 
 # Metadatos
@@ -12,12 +11,10 @@ ENV PYTHONUNBUFFERED=1
 # Directorio de trabajo
 WORKDIR /app
 
-# Instalar dependencias del sistema para PostgreSQL
+# Instalar dependencias del sistema para compilar paquetes Python
 RUN apt-get update && apt-get install -y \
-    postgresql-client \
     gcc \
     python3-dev \
-    musl-dev \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
@@ -37,7 +34,7 @@ EXPOSE 8000
 
 # Healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/api/v1/')" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/seasons/', timeout=5)" || exit 1
 
 # Comando por defecto (se puede sobreescribir en docker-compose)
 CMD ["gunicorn", "f1_analytics.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]

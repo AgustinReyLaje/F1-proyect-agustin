@@ -187,7 +187,7 @@ class ConstructorSerializer(serializers.ModelSerializer):
             return int(request.query_params['season'])
         
         active_season = Season.objects.filter(is_active=True).first()
-        return active_season.year if active_season else 2024
+        return active_season.year if active_season else 2026
     
     def _get_constructor_season(self, obj):
         """Get ConstructorSeason for current season if exists"""

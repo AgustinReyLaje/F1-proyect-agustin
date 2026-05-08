@@ -17,7 +17,7 @@ Una plataforma fullstack para análisis de datos de Fórmula 1 con arquitectura 
 - 🏎️ Gestión de pilotos con career statistics (wins, podiums, championships)
 - 🏁 Resultados de carreras y clasificaciones
 - 🏆 Championship standings en tiempo real
-- 🔄 Soporte multi-temporada (2020-2025)
+- 🔄 Soporte multi-temporada (2000-2026)
 - 📈 Progressive standings calculation (points accumulation by round)
 
 ### 🎨 **UI/UX Excellence**
@@ -88,7 +88,7 @@ cd F1-proyect-agustin
 ### 2. Levantar los servicios
 ```bash
 cd docker
-docker-compose up -d --build
+docker compose -f docker-compose.dev.yml up -d --build
 ```
 
 Esto levantará:
@@ -99,7 +99,7 @@ Esto levantará:
 ### 3. Importar datos de F1
 ```bash
 # Entrar al contenedor del backend
-docker-compose exec backend python manage.py import_f1_data --season 2024 --calculate-standings
+docker compose -f docker-compose.dev.yml exec backend python manage.py import_f1_data --season 2026 --calculate-standings
 ```
 
 ### 4. Acceder a la aplicación
@@ -173,7 +173,7 @@ Sistema completo de fin de semana de carreras con estructura modular:
 - ✅ Layout protegido que nunca colapsa
 
 ### Multi-Season Support
-Sistema completo de soporte para múltiples temporadas (2020-2025):
+Sistema completo de soporte para múltiples temporadas (2000-2026):
 - Selector de temporada global en el navbar
 - Todas las vistas se actualizan automáticamente al cambiar temporada
 - Datos persistentes con modelos Season, ConstructorSeason, DriverSeason

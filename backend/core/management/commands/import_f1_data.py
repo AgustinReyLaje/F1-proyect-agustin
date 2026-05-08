@@ -121,14 +121,14 @@ class Command(BaseCommand):
         
         for driver_data in drivers_data:
             driver, created = Driver.objects.update_or_create(
-                driver_id=driver_data['driverId'],
+                driver_id=driver_data.get('driverId', ''),
                 defaults={
                     'number': driver_data.get('permanentNumber'),
                     'code': driver_data.get('code', ''),
-                    'first_name': driver_data['givenName'],
-                    'last_name': driver_data['familyName'],
+                    'first_name': driver_data.get('givenName', ''),
+                    'last_name': driver_data.get('familyName', ''),
                     'date_of_birth': driver_data.get('dateOfBirth'),
-                    'nationality': driver_data['nationality'],
+                    'nationality': driver_data.get('nationality', ''),
                     'url': driver_data.get('url', ''),
                 }
             )
@@ -148,10 +148,10 @@ class Command(BaseCommand):
         
         for constructor_data in constructors_data:
             constructor, created = Constructor.objects.update_or_create(
-                constructor_id=constructor_data['constructorId'],
+                constructor_id=constructor_data.get('constructorId', ''),
                 defaults={
-                    'name': constructor_data['name'],
-                    'nationality': constructor_data['nationality'],
+                    'name': constructor_data.get('name', ''),
+                    'nationality': constructor_data.get('nationality', ''),
                     'url': constructor_data.get('url', ''),
                 }
             )
@@ -207,16 +207,16 @@ class Command(BaseCommand):
                 pass
         
         race, created = Race.objects.update_or_create(
-            race_id=f"{season}_{race_data['round']}",
+            race_id=f"{season}_{race_data.get('round', 0)}",
             defaults={
                 'season': season,
-                'round': int(race_data['round']),
-                'race_name': race_data['raceName'],
-                'circuit_id': circuit['circuitId'],
-                'circuit_name': circuit['circuitName'],
-                'locality': circuit['Location']['locality'],
-                'country': circuit['Location']['country'],
-                'date': race_data['date'],
+                'round': int(race_data.get('round', 0)),
+                'race_name': race_data.get('raceName', ''),
+                'circuit_id': circuit.get('circuitId', ''),
+                'circuit_name': circuit.get('circuitName', ''),
+                'locality': circuit.get('Location', {}).get('locality', ''),
+                'country': circuit.get('Location', {}).get('country', ''),
+                'date': race_data.get('date', ''),
                 'time': race_time,
                 'url': race_data.get('url', ''),
             }

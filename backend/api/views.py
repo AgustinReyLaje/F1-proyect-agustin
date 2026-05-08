@@ -17,6 +17,17 @@ from .serializers import (
 )
 
 
+CANCELLED_RACE_NAMES = [
+    'Bahrain Grand Prix',
+    'Saudi Arabian Grand Prix',
+]
+
+
+def exclude_cancelled_races(queryset, race_field='race_name'):
+    """Exclude cancelled races from querysets that include race metadata."""
+    return queryset.exclude(**{f'{race_field}__in': CANCELLED_RACE_NAMES})
+
+
 class SeasonViewSet(viewsets.ReadOnlyModelViewSet):
     """
     API endpoint for viewing F1 seasons.
@@ -56,7 +67,7 @@ class DriverSeasonViewSet(viewsets.ReadOnlyModelViewSet):
 class ConstructorViewSet(viewsets.ReadOnlyModelViewSet):
     """
     API endpoint for viewing constructors.
-    When ?season=YYYY is provided, returns only constructors that participated in that season.
+    When ?season=YYYY is provided, returns the constructors recorded for that season.
     """
     serializer_class = ConstructorSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -71,9 +82,9 @@ class ConstructorViewSet(viewsets.ReadOnlyModelViewSet):
         if season:
             try:
                 season_year = int(season)
-                # Only return constructors that have results in this season
                 queryset = queryset.filter(
-                    results__race__season=season_year
+                    Q(season_data__season__year=season_year)
+                    | Q(results__race__season=season_year)
                 ).distinct()
             except (ValueError, TypeError):
                 pass
@@ -105,6 +116,9 @@ class RaceViewSet(viewsets.ReadOnlyModelViewSet):
     ordering_fields = ['season', 'round', 'date']
     ordering = ['-season', 'round']
 
+    def get_queryset(self):
+        return exclude_cancelled_races(Race.objects.all())
+
 
 class ResultViewSet(viewsets.ReadOnlyModelViewSet):
     """
@@ -116,6 +130,12 @@ class ResultViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_fields = ['race__season', 'race', 'driver', 'constructor', 'status']
     ordering_fields = ['race', 'final_position', 'points']
     ordering = ['race', 'final_position']
+
+    def get_queryset(self):
+        return exclude_cancelled_races(
+            Result.objects.select_related('race', 'driver', 'constructor').all(),
+            'race__race_name'
+        )
 
 
 class LapViewSet(viewsets.ReadOnlyModelViewSet):
@@ -129,6 +149,12 @@ class LapViewSet(viewsets.ReadOnlyModelViewSet):
     ordering_fields = ['lap_number', 'lap_time_milliseconds']
     ordering = ['race', 'lap_number', 'position']
 
+    def get_queryset(self):
+        return exclude_cancelled_races(
+            Lap.objects.select_related('race', 'driver').all(),
+            'race__race_name'
+        )
+
 
 class ChampionshipStandingViewSet(viewsets.ReadOnlyModelViewSet):
     """
@@ -141,6 +167,21 @@ class ChampionshipStandingViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_fields = ['season', 'standing_type', 'round', 'driver', 'constructor']
     ordering_fields = ['season', 'position', 'points']
     ordering = ['season', '-round', 'standing_type', 'position']
+
+    def get_queryset(self):
+        queryset = ChampionshipStanding.objects.select_related('driver', 'constructor').all()
+        season = self.request.query_params.get('season')
+        if season:
+            try:
+                cancelled_rounds = Race.objects.filter(
+                    season=int(season),
+                    race_name__in=CANCELLED_RACE_NAMES,
+                ).values_list('round', flat=True)
+                if cancelled_rounds:
+                    queryset = queryset.exclude(round__in=cancelled_rounds)
+            except (TypeError, ValueError):
+                pass
+        return queryset
     
     @action(detail=False, methods=['get'])
     def progressive(self, request):
@@ -162,7 +203,10 @@ class ChampionshipStandingViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({'error': 'season and round must be integers'}, status=400)
         
         # Get all races up to and including this round
-        races = Race.objects.filter(season=season, round__lte=round_num).order_by('round')
+        races = exclude_cancelled_races(
+            Race.objects.filter(season=season, round__lte=round_num),
+            'race_name'
+        ).order_by('round')
         
         if standing_type == 'driver':
             # Calculate driver standings
@@ -186,6 +230,8 @@ class ChampionshipStandingViewSet(viewsets.ReadOnlyModelViewSet):
                     driver_id=driver_id,
                     race__season=season,
                     race__round__lte=round_num
+                ).exclude(
+                    race__race_name__in=CANCELLED_RACE_NAMES
                 ).select_related('constructor', 'race').order_by('-race__round', '-race__date').first()
                 
                 standings.append({
@@ -251,6 +297,12 @@ class QualifyingViewSet(viewsets.ReadOnlyModelViewSet):
     ordering_fields = ['position']
     ordering = ['race', 'position']
 
+    def get_queryset(self):
+        return exclude_cancelled_races(
+            Qualifying.objects.select_related('race', 'driver', 'constructor').all(),
+            'race__race_name'
+        )
+
 
 class SprintViewSet(viewsets.ReadOnlyModelViewSet):
     """
@@ -262,6 +314,12 @@ class SprintViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_fields = ['race__season', 'race', 'driver', 'constructor', 'status']
     ordering_fields = ['final_position', 'points']
     ordering = ['race', 'final_position']
+
+    def get_queryset(self):
+        return exclude_cancelled_races(
+            Sprint.objects.select_related('race', 'driver', 'constructor').all(),
+            'race__race_name'
+        )
 
 
 class FreePracticeViewSet(viewsets.ReadOnlyModelViewSet):
@@ -275,4 +333,10 @@ class FreePracticeViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_fields = ['race__season', 'race', 'driver', 'constructor', 'session']
     ordering_fields = ['position', 'session']
     ordering = ['race', 'session', 'position']
+
+    def get_queryset(self):
+        return exclude_cancelled_races(
+            FreePractice.objects.select_related('race', 'driver', 'constructor').all(),
+            'race__race_name'
+        )
 

@@ -27,7 +27,7 @@ export default function SeasonSelector({ currentSeason, onSeasonChange }: Season
 
   const loadSeasons = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/v1/seasons/');
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/seasons/`);
       const data = await response.json();
       setSeasons(data.results || data);
     } catch (error) {

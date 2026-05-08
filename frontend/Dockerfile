@@ -1,28 +1,23 @@
-# F1 Analytics Frontend - Next.js
-FROM node:20-alpine
-
-# Metadatos
-LABEL maintainer="F1 Analytics Platform"
-LABEL description="Next.js Frontend for F1 Analytics"
-
-# Directorio de trabajo
+# F1 Analytics Frontend - Production image
+FROM node:20-alpine AS deps
 WORKDIR /app
-
-# Copiar package files
 COPY package*.json ./
+RUN npm ci --no-audit --no-fund --progress=false
 
-# Instalar dependencias
-RUN npm install
-
-# Copiar el resto de los archivos
-COPY . .
-
-# Exponer puerto
-EXPOSE 3000
-
-# Variables de entorno
-ENV NODE_ENV=development
+FROM node:20-alpine AS builder
+WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npm run build
 
-# Comando de desarrollo
-CMD ["npm", "run", "dev"]
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/package*.json ./
+COPY --from=deps /app/node_modules ./node_modules
+EXPOSE 3000
+CMD ["npm", "run", "start"]

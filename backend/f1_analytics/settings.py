@@ -195,7 +195,7 @@ CORS_ALLOW_CREDENTIALS = True
 # F1 API Configuration (for external data fetching)
 # Using Ergast API: http://ergast.com/mrd/
 
-F1_API_BASE_URL = config('F1_API_BASE_URL', default='http://ergast.com/api/f1')
+F1_API_BASE_URL = config('F1_API_BASE_URL', default='https://api.jolpi.ca/ergast/f1')
 F1_API_RATE_LIMIT = config('F1_API_RATE_LIMIT', default=4, cast=int)  # requests per second
 
 # Logging Configuration

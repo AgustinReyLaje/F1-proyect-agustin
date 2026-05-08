@@ -3,27 +3,14 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 255, 255, 255;
-  --background-end-rgb: 255, 255, 255;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 21, 21, 30;
-    --background-end-rgb: 21, 21, 30;
-  }
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 21, 21, 30;
+  --background-end-rgb: 21, 21, 30;
 }
 
 body {
   color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  background: rgb(var(--background-start-rgb));
 }
 
 @layer utilities {
@@ -31,6 +18,7 @@ body {
     text-wrap: balance;
   }
   
+  /* Fade in animation */
   @keyframes fadeIn {
     from {
       opacity: 0;
@@ -43,9 +31,113 @@ body {
   }
   
   .animate-fadeIn {
+    animation: fadeIn 0.6s ease-out forwards;
+    opacity: 0;
+  }
+
+  /* Slide up animation */
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-slideUp {
+    animation: slideUp 0.5s ease-out forwards;
+    opacity: 0;
+  }
+
+  /* Speed line animation */
+  @keyframes speedLine {
+    0% {
+      transform: translateX(-50%);
+      opacity: 0;
+    }
+    20% {
+      opacity: 1;
+    }
+    80% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(50%);
+      opacity: 0;
+    }
+  }
+
+  .animate-speedLine {
+    animation: speedLine 4s ease-in-out infinite;
+  }
+
+  /* Pulse glow animation */
+  @keyframes pulseGlow {
+    0%, 100% {
+      box-shadow: 0 0 20px rgba(225, 6, 0, 0.3);
+    }
+    50% {
+      box-shadow: 0 0 40px rgba(225, 6, 0, 0.6);
+    }
+  }
+
+  .animate-pulseGlow {
+    animation: pulseGlow 2s ease-in-out infinite;
+  }
+
+  /* Skeleton shimmer */
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
+  .skeleton-shimmer {
+    background: linear-gradient(90deg, transparent 25%, rgba(255,255,255,0.05) 50%, transparent 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  /* Scale in animation */
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .animate-scaleIn {
+    animation: scaleIn 0.4s ease-out forwards;
+    opacity: 0;
+  }
+
+  /* Stagger children animation */
+  .stagger-children > * {
+    opacity: 0;
     animation: fadeIn 0.4s ease-out forwards;
   }
-  
+
+  .stagger-children > *:nth-child(1) { animation-delay: 0.05s; }
+  .stagger-children > *:nth-child(2) { animation-delay: 0.1s; }
+  .stagger-children > *:nth-child(3) { animation-delay: 0.15s; }
+  .stagger-children > *:nth-child(4) { animation-delay: 0.2s; }
+  .stagger-children > *:nth-child(5) { animation-delay: 0.25s; }
+  .stagger-children > *:nth-child(6) { animation-delay: 0.3s; }
+  .stagger-children > *:nth-child(7) { animation-delay: 0.35s; }
+  .stagger-children > *:nth-child(8) { animation-delay: 0.4s; }
+  .stagger-children > *:nth-child(9) { animation-delay: 0.45s; }
+  .stagger-children > *:nth-child(10) { animation-delay: 0.5s; }
+
   /* Custom scrollbar */
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
@@ -88,5 +180,25 @@ body {
   .custom-scrollbar {
     scrollbar-width: thin;
     scrollbar-color: rgba(239, 68, 68, 0.4) rgba(0, 0, 0, 0.2);
+  }
+
+  /* F1 Bar Chart styles */
+  .f1-bar {
+    transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* Carbon fiber texture */
+  .carbon-fiber {
+    background-image: 
+      linear-gradient(45deg, rgba(0,0,0,0.1) 25%, transparent 25%),
+      linear-gradient(-45deg, rgba(0,0,0,0.1) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, rgba(0,0,0,0.1) 75%),
+      linear-gradient(-45deg, transparent 75%, rgba(0,0,0,0.1) 75%);
+    background-size: 4px 4px;
+  }
+
+  /* Season transition */
+  .season-transition {
+    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
   }
 }

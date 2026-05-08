@@ -100,7 +100,7 @@ export default function TeamCardHoverInfo({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Calendar className="w-4 h-4 text-gray-300" aria-hidden="true" />
-              <span className="text-sm text-gray-300">2024 Season</span>
+              <span className="text-sm text-gray-300">Current Season</span>
             </div>
             <span className="font-semibold text-white">
               Active

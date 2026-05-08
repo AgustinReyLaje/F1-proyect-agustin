@@ -77,10 +77,7 @@ frontend/public/images/cars/2026-season/
 
 ## Data Sources
 
-- **Race data:** Ergast/Jolpica F1 API (`http://api.jolpi.ca/ergast/f1`)
-- **Team colors:** Official F1 team branding
-- **Car models:** Team press releases / FIA technical documents
-
+Los datos vienen de la **Ergast API** (mirror en `https://api.jolpi.ca/ergast/f1`)
 ## Verification
 
 ```bash

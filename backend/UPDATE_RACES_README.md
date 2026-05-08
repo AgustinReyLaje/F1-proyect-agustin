@@ -122,7 +122,7 @@ docker exec f1_analytics_web_dev python update_races.py
 
 ## 🏗️ ¿Qué datos trae de la API?
 
-Los datos vienen de la **Ergast API** (mirror en `api.jolpi.ca/ergast/f1`):
+Los datos vienen de la **Ergast API** (mirror en `https://api.jolpi.ca/ergast/f1`):
 
 | Dato | Fuente |
 |---|---|

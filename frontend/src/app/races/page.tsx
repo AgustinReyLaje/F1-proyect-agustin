@@ -6,6 +6,7 @@ import { f1Api } from '@/lib/api';
 import { Race } from '@/types/f1';
 import { ArrowLeft, Calendar, MapPin, Loader2 } from 'lucide-react';
 import { useSeason } from '@/contexts/SeasonContext';
+import { filterCancelledRaces } from '@/lib/raceFilters';
 
 export default function RacesPage() {
   const [races, setRaces] = useState<Race[]>([]);
@@ -36,7 +37,7 @@ export default function RacesPage() {
         nextUrl = nextData.next;
       }
       
-      const races = Array.isArray(allRaces) ? allRaces : [];
+      const races = filterCancelledRaces(Array.isArray(allRaces) ? allRaces : []);
       
       // Sort by round
       const sortedRaces = races.sort(
