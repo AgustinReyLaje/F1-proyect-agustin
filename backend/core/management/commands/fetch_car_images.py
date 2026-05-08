@@ -94,8 +94,8 @@ WIKI_TITLES: dict[str, dict[int, str]] = {
     },
     # ── Mercedes ─────────────────────────────────────────────────────────────
     "mercedes": {
-        2026: "Mercedes-AMG F1 W17",
-        2025: "Mercedes-AMG F1 W16",
+        2026: "Mercedes-AMG F1 W17 E Performance",
+        2025: "Mercedes-AMG F1 W16 E Performance",
         2024: "Mercedes-AMG F1 W15 E Performance",
         2023: "Mercedes-AMG F1 W14 E Performance",
         2022: "Mercedes-AMG F1 W13 E Performance",
@@ -209,6 +209,7 @@ WIKI_TITLES: dict[str, dict[int, str]] = {
         2026: "Racing Bulls VCARB 03",
     },
     "rb": {
+        2026: "Racing Bulls VCARB 03",
         2025: "Racing Bulls VCARB 02",
         2024: "RB VCARB 01",
     },
@@ -276,7 +277,7 @@ WIKI_TITLES: dict[str, dict[int, str]] = {
     },
     # ── Cadillac ─────────────────────────────────────────────────────────────
     "cadillac": {
-        2026: "Andretti Cadillac CAD-01",
+        2026: "Cadillac F1",
     },
     # ── Renault ──────────────────────────────────────────────────────────────
     "renault": {

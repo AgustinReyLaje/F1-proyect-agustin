@@ -33,6 +33,7 @@ const LOCAL_CAR_IMAGES: Record<number, Record<string, string>> = {
     'Alpine F1 Team':    '/images/cars/2026-season/alpine.png',
     'Williams':          '/images/cars/2026-season/williams.png',
     'Haas F1 Team':      '/images/cars/2026-season/haas.png',
+    'RB F1 Team':        '/images/cars/2026-season/rb.png',
     'Racing Bulls':      '/images/cars/2026-season/rb.png',
     'Sauber':            '/images/cars/2026-season/sauber.png',
   },
