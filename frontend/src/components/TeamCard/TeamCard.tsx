@@ -10,6 +10,35 @@ interface TeamCardProps {
   currentSeason?: number;
 }
 
+// Local PNG fallbacks while the DB hasn't been populated via fetch_car_images
+const LOCAL_CAR_IMAGES: Record<number, Record<string, string>> = {
+  2024: {
+    'Ferrari':       '/images/cars/2024-season/ferrari.png',
+    'Red Bull':      '/images/cars/2024-season/red-bull.png',
+    'McLaren':       '/images/cars/2024-season/mclaren.png',
+    'Mercedes':      '/images/cars/2024-season/mercedes.png',
+    'Aston Martin':  '/images/cars/2024-season/aston-martin.png',
+    'Alpine F1 Team':'/images/cars/2024-season/alpine.png',
+    'Williams':      '/images/cars/2024-season/williams.png',
+    'Haas F1 Team':  '/images/cars/2024-season/haas.png',
+    'RB F1 Team':    '/images/cars/2024-season/rb.png',
+    'Kick Sauber':   '/images/cars/2024-season/sauber.png',
+  },
+  2026: {
+    'Ferrari':           '/images/cars/2026-season/ferrari.png',
+    'Red Bull':          '/images/cars/2026-season/red-bull.png',
+    'McLaren':           '/images/cars/2026-season/mclaren.png',
+    'Mercedes':          '/images/cars/2026-season/mercedes.png',
+    'Aston Martin':      '/images/cars/2026-season/aston-martin.png',
+    'Alpine F1 Team':    '/images/cars/2026-season/alpine.png',
+    'Williams':          '/images/cars/2026-season/williams.png',
+    'Haas F1 Team':      '/images/cars/2026-season/haas.png',
+    'RB F1 Team':        '/images/cars/2026-season/rb.png',
+    'Racing Bulls':      '/images/cars/2026-season/rb.png',
+    'Sauber':            '/images/cars/2026-season/sauber.png',
+  },
+};
+
 const loadedImages = new Set<string>();
 
 function preloadImage(url: string) {
@@ -19,11 +48,14 @@ function preloadImage(url: string) {
   loadedImages.add(url);
 }
 
-function TeamCard({ constructor }: TeamCardProps) {
+function TeamCard({ constructor, currentSeason }: TeamCardProps) {
   const [isHovered, setIsHovered] = useState(false);
 
   const primaryColor = constructor.team_color || '#DC0000';
-  const carImage = constructor.car_image_url ?? null;
+  const localFallback = currentSeason
+    ? (LOCAL_CAR_IMAGES[currentSeason]?.[constructor.name] ?? null)
+    : null;
+  const carImage = constructor.car_image_url || localFallback;
 
   useEffect(() => {
     if (carImage) preloadImage(carImage);
