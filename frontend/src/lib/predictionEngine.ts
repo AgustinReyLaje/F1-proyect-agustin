@@ -35,7 +35,7 @@ export interface PredictionInput {
   lapData?: LapInput[];
   filters?: PredictionFilters;
   totalLaps?: number;
-  circuitId?: string; // circuit_id from the Race object
+  circuitId?: string;
 }
 
 interface Stint {
@@ -46,17 +46,6 @@ interface Stint {
   avgLapMs: number;
   variance: number;
   degradationMsPerLap: number;
-}
-
-interface DriverRaceProfile {
-  driverId: number;
-  racePaceMs: number;
-  consistencyScore: number;
-  bestLongStintMs: number;
-  mostConsistentStintMs: number;
-  overallAvgMs: number;
-  score: number;
-  confidence: 'low' | 'medium' | 'high';
 }
 
 export interface DriverPrediction {
@@ -75,7 +64,6 @@ export interface DriverPrediction {
   gapToLeaderMs: number;
   racePaceMs: number;
   consistencyScore: number;
-  // New: score breakdown for transparency
   scoreBreakdown?: {
     racePace: number;
     qualifying: number;
@@ -91,6 +79,18 @@ export interface PredictionResult {
   dataSourcesUsed: string[];
   overallConfidence: 'low' | 'medium' | 'high';
   circuitProfile?: CircuitProfile | null;
+}
+
+// Raw criteria per driver before MOORA normalization
+interface DriverRawCriteria {
+  driverId: number;
+  qualyScore: number;         // beneficial  0-1
+  racePaceMs: number;         // non-beneficial (lower ms = faster = better)
+  consistencyScore: number;   // beneficial  0-1
+  historicalScore: number;    // beneficial  0-1
+  teamAffinityScore: number;  // beneficial  0-1
+  puAffinityScore: number;    // beneficial  0-1
+  practiceScore: number;      // beneficial  0-1
 }
 
 const DEFAULT_FILTERS: Required<PredictionFilters> = {
@@ -115,6 +115,76 @@ const HISTORICAL_DECAY = 0.72;
 const FUEL_CORRECTION_PER_LAP_MS = 12;
 
 const predictionCache = new Map<string, PredictionResult>();
+
+// ─── MOORA ───────────────────────────────────────────────────────────────────
+
+/**
+ * MOORA Ratio System normalisation.
+ * x*[i] = x[i] / sqrt(Σ x[k]²)
+ * Makes values dimensionless and scale-invariant so ms can be mixed with 0-1 scores.
+ */
+function mooraNormalize(values: number[]): number[] {
+  const sumSq = values.reduce((s, v) => s + v * v, 0);
+  const divisor = Math.sqrt(sumSq) || 1;
+  return values.map((v) => v / divisor);
+}
+
+/**
+ * Apply MOORA Ratio System to the driver criteria matrix.
+ *
+ * Yi = Σ(w·x* for beneficial criteria) − Σ(w·x* for non-beneficial criteria)
+ *
+ * Beneficial  → higher raw value is better  (qualy score, consistency, etc.)
+ * Non-beneficial → lower raw value is better (race pace in ms)
+ */
+function applyMOORA(
+  criteria: DriverRawCriteria[],
+  weights: { qualifying: number; racePace: number; consistency: number; historical: number; teamCircuitAffinity: number; puAffinity: number }
+): Map<number, { score: number; breakdown: DriverPrediction['scoreBreakdown'] }> {
+  if (!criteria.length) return new Map();
+
+  // Normalise each column independently
+  const qualyN    = mooraNormalize(criteria.map((d) => d.qualyScore));
+  const paceN     = mooraNormalize(criteria.map((d) => d.racePaceMs));
+  const consiN    = mooraNormalize(criteria.map((d) => d.consistencyScore));
+  const histN     = mooraNormalize(criteria.map((d) => d.historicalScore));
+  const teamN     = mooraNormalize(criteria.map((d) => d.teamAffinityScore));
+  const puN       = mooraNormalize(criteria.map((d) => d.puAffinityScore));
+  const practiceN = mooraNormalize(criteria.map((d) => d.practiceScore));
+
+  const result = new Map<number, { score: number; breakdown: DriverPrediction['scoreBreakdown'] }>();
+
+  criteria.forEach((d, i) => {
+    const beneficial =
+      qualyN[i]    * weights.qualifying +
+      consiN[i]    * weights.consistency +
+      histN[i]     * weights.historical +
+      teamN[i]     * weights.teamCircuitAffinity +
+      puN[i]       * weights.puAffinity +
+      practiceN[i] * 0.04;
+
+    // Non-beneficial: subtracted — better pace (lower ms) lowers this penalty
+    const nonBeneficial = paceN[i] * weights.racePace;
+
+    const score = beneficial - nonBeneficial;
+
+    result.set(d.driverId, {
+      score,
+      breakdown: {
+        racePace:           Math.round(nonBeneficial * 1000) / 1000,
+        qualifying:         Math.round(qualyN[i] * weights.qualifying * 1000) / 1000,
+        consistency:        Math.round(consiN[i] * weights.consistency * 1000) / 1000,
+        historical:         Math.round(histN[i] * weights.historical * 1000) / 1000,
+        teamCircuitAffinity:Math.round(teamN[i] * weights.teamCircuitAffinity * 1000) / 1000,
+        puAffinity:         Math.round(puN[i] * weights.puAffinity * 1000) / 1000,
+      },
+    });
+  });
+
+  return result;
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function normalizePosition(position: number, totalDrivers: number): number {
   if (totalDrivers <= 1) return 1;
@@ -147,9 +217,7 @@ export function filterLapData(laps: LapInput[], filters?: PredictionFilters): La
     if (merged.session && merged.session !== 'FP2') {
       if ((lap.session || 'FP2') !== merged.session) return false;
     }
-    if (merged.tyreCompound !== 'UNKNOWN' && normalizeCompound(lap.tyreCompound) !== merged.tyreCompound) {
-      return false;
-    }
+    if (merged.tyreCompound !== 'UNKNOWN' && normalizeCompound(lap.tyreCompound) !== merged.tyreCompound) return false;
     if (lap.lapNumber < merged.minLap || lap.lapNumber > merged.maxLap) return false;
     return true;
   });
@@ -159,29 +227,25 @@ function median(values: number[]): number {
   if (!values.length) return 0;
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
-  if (sorted.length % 2 === 0) return (sorted[mid - 1] + sorted[mid]) / 2;
-  return sorted[mid];
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
 }
 
 function stdDev(values: number[]): number {
   if (values.length <= 1) return 0;
-  const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
-  const variance = values.reduce((sum, v) => sum + (v - avg) * (v - avg), 0) / values.length;
-  return Math.sqrt(variance);
+  const avg = values.reduce((s, v) => s + v, 0) / values.length;
+  return Math.sqrt(values.reduce((s, v) => s + (v - avg) ** 2, 0) / values.length);
 }
 
 function slope(values: number[]): number {
   if (values.length < 2) return 0;
-  let xSum = 0, ySum = 0, xySum = 0, xxSum = 0;
+  let xS = 0, yS = 0, xyS = 0, xxS = 0;
   for (let i = 0; i < values.length; i++) {
-    const x = i + 1;
-    const y = values[i];
-    xSum += x; ySum += y; xySum += x * y; xxSum += x * x;
+    const x = i + 1, y = values[i];
+    xS += x; yS += y; xyS += x * y; xxS += x * x;
   }
   const n = values.length;
-  const denominator = n * xxSum - xSum * xSum;
-  if (denominator === 0) return 0;
-  return (n * xySum - xSum * ySum) / denominator;
+  const denom = n * xxS - xS * xS;
+  return denom === 0 ? 0 : (n * xyS - xS * yS) / denom;
 }
 
 function cleanValidLaps(laps: LapInput[], includeOutliers: boolean): LapInput[] {
@@ -195,19 +259,12 @@ function cleanValidLaps(laps: LapInput[], includeOutliers: boolean): LapInput[] 
 
   const cleaned: LapInput[] = [];
   byDriver.forEach((driverLaps) => {
-    const lapTimes = driverLaps.map((l) => l.lapTimeMs);
-    const driverMedian = median(lapTimes);
-    const absoluteCap = Math.round(driverMedian * 1.08);
-    let kept = driverLaps.filter((lap) => lap.lapTimeMs <= absoluteCap);
-
+    const cap = Math.round(median(driverLaps.map((l) => l.lapTimeMs)) * 1.08);
+    let kept = driverLaps.filter((l) => l.lapTimeMs <= cap);
     if (!includeOutliers && kept.length > 4) {
       const med = median(kept.map((l) => l.lapTimeMs));
-      const deviations = kept.map((l) => Math.abs(l.lapTimeMs - med));
-      const mad = median(deviations) || 1;
-      kept = kept.filter((lap) => {
-        const z = (0.6745 * Math.abs(lap.lapTimeMs - med)) / mad;
-        return z <= 3.5;
-      });
+      const mad = median(kept.map((l) => Math.abs(l.lapTimeMs - med))) || 1;
+      kept = kept.filter((l) => (0.6745 * Math.abs(l.lapTimeMs - med)) / mad <= 3.5);
     }
     cleaned.push(...kept);
   });
@@ -228,12 +285,13 @@ function detectStints(laps: LapInput[], minStintLength: number): Stint[] {
     let current: LapInput[] = [];
     for (const lap of sorted) {
       const prev = current[current.length - 1];
-      const sameCompound = normalizeCompound(prev?.tyreCompound) === normalizeCompound(lap.tyreCompound);
-      const sameSession = (prev?.session || 'FP2') === (lap.session || 'FP2');
-      const consecutive = prev ? lap.lapNumber === prev.lapNumber + 1 : true;
-      if (!prev || (sameCompound && sameSession && consecutive)) {
-        current.push(lap);
-      } else {
+      const ok = !prev || (
+        normalizeCompound(prev.tyreCompound) === normalizeCompound(lap.tyreCompound) &&
+        (prev.session || 'FP2') === (lap.session || 'FP2') &&
+        lap.lapNumber === prev.lapNumber + 1
+      );
+      if (ok) { current.push(lap); }
+      else {
         if (current.length >= minStintLength) stints.push(buildStint(driverId, current));
         current = [lap];
       }
@@ -245,17 +303,16 @@ function detectStints(laps: LapInput[], minStintLength: number): Stint[] {
 
 function buildStint(driverId: number, laps: LapInput[]): Stint {
   const rawTimes = laps.map((lap) => {
-    const fuelAdjusted = lap.lapTimeMs - Math.max(0, (90 - lap.lapNumber)) * FUEL_CORRECTION_PER_LAP_MS;
-    const sessionFactor = lap.session === 'FP1' ? 1.006 : lap.session === 'FP3' ? 0.997 : 1;
-    return Math.round(fuelAdjusted * sessionFactor);
+    const fuel = lap.lapTimeMs - Math.max(0, (90 - lap.lapNumber)) * FUEL_CORRECTION_PER_LAP_MS;
+    const sf = lap.session === 'FP1' ? 1.006 : lap.session === 'FP3' ? 0.997 : 1;
+    return Math.round(fuel * sf);
   });
-
   return {
     driverId,
     compound: normalizeCompound(laps[0].tyreCompound),
     session: laps[0].session || 'FP2',
     laps,
-    avgLapMs: Math.round(rawTimes.reduce((sum, v) => sum + v, 0) / rawTimes.length),
+    avgLapMs: Math.round(rawTimes.reduce((s, v) => s + v, 0) / rawTimes.length),
     variance: stdDev(rawTimes),
     degradationMsPerLap: Math.max(0, slope(rawTimes)),
   };
@@ -263,30 +320,30 @@ function buildStint(driverId: number, laps: LapInput[]): Stint {
 
 function buildLapDataFromFreePractice(freePractice: FreePractice[]): LapInput[] {
   const laps: LapInput[] = [];
-  freePractice
-    .filter((fp) => fp.best_lap_time)
-    .forEach((fp) => {
-      const ms = parseLapTimeToMs(fp.best_lap_time);
-      if (!ms) return;
-      const syntheticLaps = Math.max(3, Math.min(10, Math.floor(fp.laps / 4) || 3));
-      for (let idx = 0; idx < syntheticLaps; idx++) {
-        laps.push({
-          driverId: fp.driver.id,
-          driverName: `${fp.driver.first_name} ${fp.driver.last_name}`,
-          driverCode: fp.driver.code,
-          teamName: fp.constructor.name,
-          teamColor: fp.constructor.team_color,
-          lapTimeMs: ms + idx * 35,
-          lapNumber: idx + 1,
-          tyreCompound: 'UNKNOWN',
-          session: fp.session,
-          isOutLap: idx === 0,
-          isInLap: idx === syntheticLaps - 1,
-        });
-      }
-    });
+  freePractice.filter((fp) => fp.best_lap_time).forEach((fp) => {
+    const ms = parseLapTimeToMs(fp.best_lap_time);
+    if (!ms) return;
+    const n = Math.max(3, Math.min(10, Math.floor(fp.laps / 4) || 3));
+    for (let i = 0; i < n; i++) {
+      laps.push({
+        driverId: fp.driver.id,
+        driverName: `${fp.driver.first_name} ${fp.driver.last_name}`,
+        driverCode: fp.driver.code,
+        teamName: fp.constructor.name,
+        teamColor: fp.constructor.team_color,
+        lapTimeMs: ms + i * 35,
+        lapNumber: i + 1,
+        tyreCompound: 'UNKNOWN',
+        session: fp.session,
+        isOutLap: i === 0,
+        isInLap: i === n - 1,
+      });
+    }
+  });
   return laps;
 }
+
+// ─── Score builders ───────────────────────────────────────────────────────────
 
 function getQualifyingScores(qualifying: Qualifying[]): Map<number, number> {
   const scores = new Map<number, number>();
@@ -296,224 +353,142 @@ function getQualifyingScores(qualifying: Qualifying[]): Map<number, number> {
 }
 
 function getHistoricalScores(previousResults: Result[][]): Map<number, number> {
-  const weighted = new Map<number, { weightedSum: number; weightSum: number }>();
+  const weighted = new Map<number, { ws: number; wt: number }>();
   previousResults.forEach((raceResults, raceIndex) => {
     const weight = Math.pow(HISTORICAL_DECAY, previousResults.length - 1 - raceIndex);
-    const totalDrivers = raceResults.length || 20;
-    raceResults.forEach((result) => {
-      const position = result.final_position || totalDrivers;
-      const value = normalizePosition(position, totalDrivers);
-      const existing = weighted.get(result.driver.id) || { weightedSum: 0, weightSum: 0 };
-      existing.weightedSum += value * weight;
-      existing.weightSum += weight;
-      weighted.set(result.driver.id, existing);
+    const total = raceResults.length || 20;
+    raceResults.forEach((r) => {
+      const v = normalizePosition(r.final_position || total, total);
+      const e = weighted.get(r.driver.id) || { ws: 0, wt: 0 };
+      e.ws += v * weight; e.wt += weight;
+      weighted.set(r.driver.id, e);
     });
   });
-
   const scores = new Map<number, number>();
-  weighted.forEach(({ weightedSum, weightSum }, driverId) => {
-    scores.set(driverId, weightSum > 0 ? weightedSum / weightSum : 0);
-  });
+  weighted.forEach(({ ws, wt }, id) => scores.set(id, wt > 0 ? ws / wt : 0));
   return scores;
 }
 
 function getPracticeScores(freePractice: FreePractice[]): Map<number, number> {
-  const driverPositions = new Map<number, number[]>();
+  const pos = new Map<number, number[]>();
   freePractice.forEach((fp) => {
-    const existing = driverPositions.get(fp.driver.id) || [];
-    existing.push(fp.position);
-    driverPositions.set(fp.driver.id, existing);
+    const e = pos.get(fp.driver.id) || [];
+    e.push(fp.position);
+    pos.set(fp.driver.id, e);
   });
-
-  const totalDrivers = Math.max(1, driverPositions.size);
+  const total = Math.max(1, pos.size);
   const scores = new Map<number, number>();
-  driverPositions.forEach((positions, driverId) => {
-    const avgPosition = positions.reduce((sum, p) => sum + p, 0) / positions.length;
-    scores.set(driverId, normalizePosition(avgPosition, totalDrivers));
+  pos.forEach((positions, id) => {
+    scores.set(id, normalizePosition(positions.reduce((s, p) => s + p, 0) / positions.length, total));
   });
   return scores;
 }
 
-// Returns per-driver affinity score based on teammate/PU-mate performance at similar circuits.
-// allResults: flat list of all previous results with circuit info attached
+function getRacePacePerDriver(stints: Stint[]): Map<number, { racePaceMs: number; consistencyScore: number; confidence: 'low' | 'medium' | 'high'; degradationMsPerLap: number }> {
+  const byDriver = new Map<number, Stint[]>();
+  stints.forEach((s) => {
+    const e = byDriver.get(s.driverId) || [];
+    e.push(s);
+    byDriver.set(s.driverId, e);
+  });
+
+  const result = new Map<number, { racePaceMs: number; consistencyScore: number; confidence: 'low' | 'medium' | 'high'; degradationMsPerLap: number }>();
+
+  byDriver.forEach((driverStints, driverId) => {
+    const weighted = driverStints.map((s) => {
+      const tw = TYRE_WEIGHTS[s.compound] || TYRE_WEIGHTS.UNKNOWN;
+      const lw = Math.min(1.25, 0.55 + s.laps.length / 8);
+      const dp = Math.min(1.12, 1 + s.degradationMsPerLap / 500);
+      return { pace: s.avgLapMs * dp, weight: tw * lw, length: s.laps.length, variance: s.variance };
+    });
+
+    const longStints = weighted.filter((s) => s.length >= 8);
+    const bestLong = (longStints.length ? longStints : weighted)
+      .reduce((b, c) => Math.min(b, c.pace), Number.MAX_SAFE_INTEGER);
+    const mostConsistent = weighted.reduce((b, c) => (c.variance < b.variance ? c : b), weighted[0]);
+    const ws = weighted.reduce((s, x) => s + x.pace * x.weight, 0);
+    const wt = weighted.reduce((s, x) => s + x.weight, 0) || 1;
+
+    const racePaceMs = bestLong * 0.45 + mostConsistent.pace * 0.35 + (ws / wt) * 0.2;
+    const consistencyScore = Math.max(0, 1 - mostConsistent.variance / 1200);
+    const avgDeg = driverStints.reduce((s, x) => s + x.degradationMsPerLap, 0) / driverStints.length;
+    const confidence: 'low' | 'medium' | 'high' =
+      driverStints.length >= 2 && longStints.length >= 1 ? 'high' :
+      driverStints.length >= 1 ? 'medium' : 'low';
+
+    result.set(driverId, { racePaceMs, consistencyScore, confidence, degradationMsPerLap: avgDeg });
+  });
+
+  return result;
+}
+
 function getTeamCircuitAffinityScores(
   previousResults: Result[][],
-  races: Array<{ circuitId: string }>,
+  races: { circuitId: string }[],
   targetProfile: CircuitProfile | null
 ): Map<number, number> {
   const scores = new Map<number, number>();
   if (!targetProfile || !races.length) return scores;
 
-  // Build: driverId -> teamName
-  const driverTeam = new Map<number, string>();
-  previousResults.flat().forEach((r) => {
-    driverTeam.set(r.driver.id, r.constructor.name);
-  });
-
-  // For each driver, look at ALL teammates' results at circuits similar to target
-  // team circuit affinity = how does this team perform at circuits like this one
-  const teamAffinityScores = new Map<string, { sum: number; count: number }>();
-
-  previousResults.forEach((raceResults, raceIndex) => {
-    const raceCircuitId = races[raceIndex]?.circuitId;
-    if (!raceCircuitId) return;
-
-    const raceProfile = getCircuitProfile(raceCircuitId);
+  const teamAcc = new Map<string, { sum: number; count: number }>();
+  previousResults.forEach((raceResults, i) => {
+    const raceProfile = getCircuitProfile(races[i]?.circuitId || '');
     if (!raceProfile) return;
-
-    const similarity = circuitSimilarity(targetProfile, raceProfile);
-    if (similarity < 0.4) return; // only use reasonably similar circuits
-
-    const totalDrivers = raceResults.length || 20;
-    raceResults.forEach((result) => {
-      const teamName = result.constructor.name;
-      const position = result.final_position || totalDrivers;
-      const value = normalizePosition(position, totalDrivers) * similarity;
-
-      const existing = teamAffinityScores.get(teamName) || { sum: 0, count: 0 };
-      existing.sum += value;
-      existing.count += 1;
-      teamAffinityScores.set(teamName, existing);
+    const sim = circuitSimilarity(targetProfile, raceProfile);
+    if (sim < 0.4) return;
+    const total = raceResults.length || 20;
+    raceResults.forEach((r) => {
+      const v = normalizePosition(r.final_position || total, total) * sim;
+      const e = teamAcc.get(r.constructor.name) || { sum: 0, count: 0 };
+      e.sum += v; e.count += 1;
+      teamAcc.set(r.constructor.name, e);
     });
   });
 
-  // Assign team affinity score to each driver
-  driverTeam.forEach((teamName, driverId) => {
-    const affinity = teamAffinityScores.get(teamName);
-    if (affinity && affinity.count > 0) {
-      scores.set(driverId, affinity.sum / affinity.count);
-    }
-  });
-
-  return scores;
-}
-
-// PU affinity: how do all teams with the same PU perform at power-sensitive circuits
-function getPUAffinityScores(
-  previousResults: Result[][],
-  races: Array<{ circuitId: string }>,
-  targetProfile: CircuitProfile | null
-): Map<number, number> {
-  const scores = new Map<number, number>();
-  if (!targetProfile || !races.length) return scores;
-
-  // Only meaningful on power-sensitive circuits
-  if (targetProfile.powerSensitivity === 'low') return scores;
-
-  const puAffinityScores = new Map<string, { sum: number; count: number }>();
-
-  previousResults.forEach((raceResults, raceIndex) => {
-    const raceCircuitId = races[raceIndex]?.circuitId;
-    if (!raceCircuitId) return;
-
-    const raceProfile = getCircuitProfile(raceCircuitId);
-    if (!raceProfile) return;
-
-    // Only use races with similar power sensitivity
-    if (raceProfile.powerSensitivity !== targetProfile.powerSensitivity) return;
-
-    const totalDrivers = raceResults.length || 20;
-    raceResults.forEach((result) => {
-      const pu = getPUSupplier(result.constructor.name);
-      if (!pu) return;
-
-      const position = result.final_position || totalDrivers;
-      const value = normalizePosition(position, totalDrivers);
-
-      const existing = puAffinityScores.get(pu) || { sum: 0, count: 0 };
-      existing.sum += value;
-      existing.count += 1;
-      puAffinityScores.set(pu, existing);
-    });
-  });
-
-  // Assign PU affinity to each driver via their team's PU
   const driverTeam = new Map<number, string>();
   previousResults.flat().forEach((r) => driverTeam.set(r.driver.id, r.constructor.name));
-
-  driverTeam.forEach((teamName, driverId) => {
-    const pu = getPUSupplier(teamName);
-    if (!pu) return;
-    const affinity = puAffinityScores.get(pu);
-    if (affinity && affinity.count > 0) {
-      scores.set(driverId, affinity.sum / affinity.count);
-    }
+  driverTeam.forEach((team, id) => {
+    const e = teamAcc.get(team);
+    if (e && e.count > 0) scores.set(id, e.sum / e.count);
   });
-
   return scores;
 }
 
-function buildRaceProfiles(
-  stints: Stint[],
-  qualifiers: Qualifying[],
-  practiceScores: Map<number, number>,
-  historicalScores: Map<number, number>
-): Map<number, DriverRaceProfile> {
-  const byDriver = new Map<number, Stint[]>();
-  stints.forEach((stint) => {
-    const existing = byDriver.get(stint.driverId) || [];
-    existing.push(stint);
-    byDriver.set(stint.driverId, existing);
-  });
+function getPUAffinityScores(
+  previousResults: Result[][],
+  races: { circuitId: string }[],
+  targetProfile: CircuitProfile | null
+): Map<number, number> {
+  const scores = new Map<number, number>();
+  if (!targetProfile || !races.length || targetProfile.powerSensitivity === 'low') return scores;
 
-  const profiles = new Map<number, DriverRaceProfile>();
-  byDriver.forEach((driverStints, driverId) => {
-    const weightedLapValues = driverStints.map((stint) => {
-      const tyreWeight = TYRE_WEIGHTS[stint.compound] || TYRE_WEIGHTS.UNKNOWN;
-      const stintLengthWeight = Math.min(1.25, 0.55 + stint.laps.length / 8);
-      const degradationPenalty = Math.min(1.12, 1 + stint.degradationMsPerLap / 500);
-      return {
-        pace: stint.avgLapMs * degradationPenalty,
-        weight: tyreWeight * stintLengthWeight,
-        length: stint.laps.length,
-        variance: stint.variance,
-      };
-    });
-
-    const longStints = weightedLapValues.filter((s) => s.length >= 8);
-    const bestLongStintMs = (longStints.length ? longStints : weightedLapValues)
-      .reduce((best, curr) => Math.min(best, curr.pace), Number.MAX_SAFE_INTEGER);
-
-    const mostConsistent = weightedLapValues.reduce(
-      (best, curr) => (curr.variance < best.variance ? curr : best),
-      weightedLapValues[0]
-    );
-
-    const weightedSum = weightedLapValues.reduce((sum, s) => sum + s.pace * s.weight, 0);
-    const totalWeight = weightedLapValues.reduce((sum, s) => sum + s.weight, 0) || 1;
-    const overallAvgMs = weightedSum / totalWeight;
-    const consistencyScore = Math.max(0, 1 - mostConsistent.variance / 1200);
-    const racePaceMs = bestLongStintMs * 0.45 + mostConsistent.pace * 0.35 + overallAvgMs * 0.2;
-
-    const qualyPosition = qualifiers.find((q) => q.driver.id === driverId)?.position;
-    const qualyScore = qualyPosition ? normalizePosition(qualyPosition, qualifiers.length || 20) : 0;
-    const paceNormalized = Math.max(0, Math.min(1, 1 - (racePaceMs - 80000) / 25000));
-
-    // Preliminary score used only for profile building (weights applied in main loop)
-    const score = paceNormalized * 0.65 + qualyScore * 0.25 + consistencyScore * 0.1;
-
-    const stintCount = driverStints.length;
-    const confidence: 'low' | 'medium' | 'high' =
-      stintCount >= 2 && longStints.length >= 1 ? 'high' : stintCount >= 1 ? 'medium' : 'low';
-
-    profiles.set(driverId, {
-      driverId,
-      racePaceMs,
-      consistencyScore,
-      bestLongStintMs,
-      mostConsistentStintMs: mostConsistent.pace,
-      overallAvgMs,
-      score,
-      confidence,
+  const puAcc = new Map<string, { sum: number; count: number }>();
+  previousResults.forEach((raceResults, i) => {
+    const raceProfile = getCircuitProfile(races[i]?.circuitId || '');
+    if (!raceProfile || raceProfile.powerSensitivity !== targetProfile.powerSensitivity) return;
+    const total = raceResults.length || 20;
+    raceResults.forEach((r) => {
+      const pu = getPUSupplier(r.constructor.name);
+      if (!pu) return;
+      const v = normalizePosition(r.final_position || total, total);
+      const e = puAcc.get(pu) || { sum: 0, count: 0 };
+      e.sum += v; e.count += 1;
+      puAcc.set(pu, e);
     });
   });
 
-  return profiles;
+  const driverTeam = new Map<number, string>();
+  previousResults.flat().forEach((r) => driverTeam.set(r.driver.id, r.constructor.name));
+  driverTeam.forEach((team, id) => {
+    const pu = getPUSupplier(team);
+    if (!pu) return;
+    const e = puAcc.get(pu);
+    if (e && e.count > 0) scores.set(id, e.sum / e.count);
+  });
+  return scores;
 }
 
-function estimateTotalTimeMs(racePaceMs: number, totalLaps: number, degradationMsPerLap: number, pitStops: number): number {
-  return Math.round(racePaceMs * totalLaps + pitStops * 22000 + degradationMsPerLap * totalLaps * 0.35);
-}
+// ─── Main ─────────────────────────────────────────────────────────────────────
 
 function buildCacheKey(input: PredictionInput): string {
   return JSON.stringify({
@@ -541,174 +516,139 @@ export function predictRace(
   if (input.previousResults.some((r) => r.length > 0)) dataSources.push('Historical Results');
   if ((input.lapData?.length || 0) > 0) dataSources.push('Lap-by-Lap');
 
-  // Circuit profile & weights
   const circuitProfile = input.circuitId ? getCircuitProfile(input.circuitId) : null;
   const weights = getCircuitWeights(circuitProfile);
-
   if (circuitProfile) dataSources.push(`Circuit: ${circuitProfile.name}`);
 
   // Lap processing
-  const candidateLapData = (input.lapData && input.lapData.length)
-    ? input.lapData
-    : buildLapDataFromFreePractice(input.freePractice);
+  const candidateLaps = (input.lapData?.length) ? input.lapData : buildLapDataFromFreePractice(input.freePractice);
+  const filtered  = filterLapData(candidateLaps, input.filters);
+  const cleaned   = cleanValidLaps(filtered, Boolean(input.filters?.includeOutliers));
+  const stints    = detectStints(cleaned, input.filters?.minStintLength ?? DEFAULT_FILTERS.minStintLength);
 
-  const filtered = filterLapData(candidateLapData, input.filters);
-  const cleaned = cleanValidLaps(filtered, Boolean(input.filters?.includeOutliers));
-  const stints = detectStints(cleaned, input.filters?.minStintLength || DEFAULT_FILTERS.minStintLength);
-
-  // Base scores
-  const qualyScores = getQualifyingScores(input.qualifying);
+  // Sub-scores
+  const qualyScores    = getQualifyingScores(input.qualifying);
   const practiceScores = getPracticeScores(input.freePractice);
   const historicalScores = getHistoricalScores(input.previousResults);
+  const paceProfiles   = getRacePacePerDriver(stints);
 
-  // Circuit affinity scores (uses previous race circuit IDs for similarity lookup)
   const racesForAffinity = previousRaceCircuitIds.map((cid) => ({ circuitId: cid }));
-  const teamAffinityScores = getTeamCircuitAffinityScores(
-    input.previousResults, racesForAffinity, circuitProfile
-  );
-  const puAffinityScores = getPUAffinityScores(
-    input.previousResults, racesForAffinity, circuitProfile
-  );
+  const teamAffinityScores = getTeamCircuitAffinityScores(input.previousResults, racesForAffinity, circuitProfile);
+  const puAffinityScores   = getPUAffinityScores(input.previousResults, racesForAffinity, circuitProfile);
 
   if (teamAffinityScores.size > 0) dataSources.push('Team Circuit Affinity');
-  if (puAffinityScores.size > 0) dataSources.push('PU Affinity');
-
-  const profiles = buildRaceProfiles(stints, input.qualifying, practiceScores, historicalScores);
+  if (puAffinityScores.size > 0)   dataSources.push('PU Affinity');
 
   // Collect all known drivers
   const allDrivers = new Map<number, { name: string; code: string; teamName: string; teamColor: string | null }>();
+  const addDriver = (id: number, fn: string, ln: string, code: string, team: string, color: string | null) => {
+    if (!allDrivers.has(id)) allDrivers.set(id, { name: `${fn} ${ln}`, code, teamName: team, teamColor: color });
+  };
+  input.qualifying.forEach((q) => addDriver(q.driver.id, q.driver.first_name, q.driver.last_name, q.driver.code, q.constructor.name, q.constructor.team_color));
+  input.freePractice.forEach((fp) => addDriver(fp.driver.id, fp.driver.first_name, fp.driver.last_name, fp.driver.code, fp.constructor.name, fp.constructor.team_color));
+  input.previousResults.flat().forEach((r) => addDriver(r.driver.id, r.driver.first_name, r.driver.last_name, r.driver.code, r.constructor.name, r.constructor.team_color));
 
-  input.qualifying.forEach((q) => {
-    allDrivers.set(q.driver.id, {
-      name: `${q.driver.first_name} ${q.driver.last_name}`,
-      code: q.driver.code,
-      teamName: q.constructor.name,
-      teamColor: q.constructor.team_color,
-    });
-  });
-  input.freePractice.forEach((fp) => {
-    if (!allDrivers.has(fp.driver.id)) {
-      allDrivers.set(fp.driver.id, {
-        name: `${fp.driver.first_name} ${fp.driver.last_name}`,
-        code: fp.driver.code,
-        teamName: fp.constructor.name,
-        teamColor: fp.constructor.team_color,
-      });
-    }
-  });
-  input.previousResults.flat().forEach((r) => {
-    if (!allDrivers.has(r.driver.id)) {
-      allDrivers.set(r.driver.id, {
-        name: `${r.driver.first_name} ${r.driver.last_name}`,
-        code: r.driver.code,
-        teamName: r.constructor.name,
-        teamColor: r.constructor.team_color,
-      });
-    }
-  });
+  // Default pace when no stint data exists — estimated from historical score
+  const globalMedianPaceMs = (() => {
+    const paces = [...paceProfiles.values()].map((p) => p.racePaceMs);
+    return paces.length ? median(paces) : 90000;
+  })();
 
-  const predictions: DriverPrediction[] = [];
+  // Build raw criteria matrix for MOORA
+  const criteriaMatrix: DriverRawCriteria[] = [];
   const totalLaps = input.totalLaps || 58;
 
+  allDrivers.forEach((_, driverId) => {
+    const hist = historicalScores.get(driverId) || 0;
+    const pace = paceProfiles.get(driverId);
+
+    criteriaMatrix.push({
+      driverId,
+      qualyScore:          qualyScores.get(driverId) || 0,
+      racePaceMs:          pace?.racePaceMs ?? (globalMedianPaceMs + (1 - hist) * 3000),
+      consistencyScore:    pace?.consistencyScore ?? 0.45,
+      historicalScore:     hist,
+      teamAffinityScore:   teamAffinityScores.get(driverId) ?? hist * 0.6,
+      puAffinityScore:     puAffinityScores.get(driverId) ?? hist * 0.4,
+      practiceScore:       practiceScores.get(driverId) || 0,
+    });
+  });
+
+  // Apply MOORA
+  const mooraResults = applyMOORA(criteriaMatrix, weights);
+
+  // Build final predictions
+  const predictions: DriverPrediction[] = [];
+
   allDrivers.forEach((driverInfo, driverId) => {
-    const profile = profiles.get(driverId);
-    const racePaceMs = profile?.racePaceMs || 90000 - (historicalScores.get(driverId) || 0) * 4000;
-    const consistencyScore = profile?.consistencyScore || 0.45;
+    const moora  = mooraResults.get(driverId);
+    const pace   = paceProfiles.get(driverId);
+    const raw    = criteriaMatrix.find((c) => c.driverId === driverId)!;
 
-    // Normalized sub-scores (0-1)
-    const paceNorm = Math.max(0, Math.min(1, 1 - (racePaceMs - 80000) / 25000));
-    const qualyNorm = qualyScores.get(driverId) || 0;
-    const histNorm = historicalScores.get(driverId) || 0;
-    const practiceNorm = practiceScores.get(driverId) || 0;
-    const teamAffinityNorm = teamAffinityScores.get(driverId) || histNorm * 0.6; // fallback to partial historical
-    const puAffinityNorm = puAffinityScores.get(driverId) || histNorm * 0.4;
+    const racePaceMs      = raw.racePaceMs;
+    const consistencyScore = raw.consistencyScore;
+    const avgDeg          = pace?.degradationMsPerLap ?? 0;
+    const pitStops        = stints.filter((s) => s.driverId === driverId).length >= 3 ? 2 : 1;
+    const predictedTotalTimeMs = Math.round(racePaceMs * totalLaps + pitStops * 22000 + avgDeg * totalLaps * 0.35);
 
-    // Weighted final score using circuit-specific weights
-    const score =
-      paceNorm           * weights.racePace +
-      qualyNorm          * weights.qualifying +
-      consistencyScore   * weights.consistency +
-      histNorm           * weights.historical +
-      teamAffinityNorm   * weights.teamCircuitAffinity +
-      puAffinityNorm     * weights.puAffinity +
-      practiceNorm       * 0.04; // small constant contribution
-
-    const driverStints = stints.filter((s) => s.driverId === driverId);
-    const avgDegradation = driverStints.length
-      ? driverStints.reduce((sum, stint) => sum + stint.degradationMsPerLap, 0) / driverStints.length
-      : 0;
-
-    const pitStops = driverStints.length >= 3 ? 2 : 1;
-    const predictedTotalTimeMs = estimateTotalTimeMs(racePaceMs, totalLaps, avgDegradation, pitStops);
-
-    const qualyEntry = input.qualifying.find((q) => q.driver.id === driverId);
+    const qualyEntry      = input.qualifying.find((q) => q.driver.id === driverId);
     const practiceEntries = input.freePractice.filter((fp) => fp.driver.id === driverId);
-    const avgPracticePosition = practiceEntries.length
-      ? practiceEntries.reduce((sum, fp) => sum + fp.position, 0) / practiceEntries.length
+    const avgPracticePos  = practiceEntries.length
+      ? practiceEntries.reduce((s, fp) => s + fp.position, 0) / practiceEntries.length
       : null;
 
     const histPositions: number[] = [];
     input.previousResults.forEach((rr) => {
-      const result = rr.find((r) => r.driver.id === driverId);
-      if (result?.final_position) histPositions.push(result.final_position);
+      const r = rr.find((x) => x.driver.id === driverId);
+      if (r?.final_position) histPositions.push(r.final_position);
     });
-    const historicalAvgPosition = histPositions.length
-      ? histPositions.reduce((sum, p) => sum + p, 0) / histPositions.length
+    const historicalAvgPos = histPositions.length
+      ? histPositions.reduce((s, p) => s + p, 0) / histPositions.length
       : null;
+
+    const confidence: 'low' | 'medium' | 'high' =
+      pace?.confidence ?? (histPositions.length >= 3 ? 'medium' : 'low');
 
     predictions.push({
       driverId,
-      driverName: driverInfo.name,
-      driverCode: driverInfo.code,
-      teamName: driverInfo.teamName,
-      teamColor: driverInfo.teamColor,
-      predictedPosition: 0,
-      score,
-      confidence: profile?.confidence || (histPositions.length >= 3 ? 'medium' : 'low'),
-      qualyPosition: qualyEntry?.position ?? null,
-      avgPracticePosition: avgPracticePosition ? Math.round(avgPracticePosition * 10) / 10 : null,
-      historicalAvgPosition: historicalAvgPosition ? Math.round(historicalAvgPosition * 10) / 10 : null,
+      driverName:          driverInfo.name,
+      driverCode:          driverInfo.code,
+      teamName:            driverInfo.teamName,
+      teamColor:           driverInfo.teamColor,
+      predictedPosition:   0,
+      score:               moora?.score ?? 0,
+      confidence,
+      qualyPosition:       qualyEntry?.position ?? null,
+      avgPracticePosition: avgPracticePos ? Math.round(avgPracticePos * 10) / 10 : null,
+      historicalAvgPosition: historicalAvgPos ? Math.round(historicalAvgPos * 10) / 10 : null,
       predictedTotalTimeMs,
-      gapToLeaderMs: 0,
+      gapToLeaderMs:       0,
       racePaceMs,
       consistencyScore,
-      scoreBreakdown: {
-        racePace: Math.round(paceNorm * weights.racePace * 1000) / 1000,
-        qualifying: Math.round(qualyNorm * weights.qualifying * 1000) / 1000,
-        consistency: Math.round(consistencyScore * weights.consistency * 1000) / 1000,
-        historical: Math.round(histNorm * weights.historical * 1000) / 1000,
-        teamCircuitAffinity: Math.round(teamAffinityNorm * weights.teamCircuitAffinity * 1000) / 1000,
-        puAffinity: Math.round(puAffinityNorm * weights.puAffinity * 1000) / 1000,
-      },
+      scoreBreakdown:      moora?.breakdown,
     });
   });
 
+  // Sort by MOORA score descending
   predictions.sort((a, b) => b.score - a.score || a.predictedTotalTimeMs - b.predictedTotalTimeMs);
 
   const leaderTime = predictions[0]?.predictedTotalTimeMs || 0;
-  predictions.forEach((pred, index) => {
-    pred.predictedPosition = index + 1;
-    pred.gapToLeaderMs = Math.max(0, pred.predictedTotalTimeMs - leaderTime);
+  predictions.forEach((p, i) => {
+    p.predictedPosition = i + 1;
+    p.gapToLeaderMs = Math.max(0, p.predictedTotalTimeMs - leaderTime);
   });
 
-  // Safety car likelihood degrades confidence — SC/VSC can completely randomise results
+  // Downgrade confidence on high SC-risk circuits
   const scLikelihood = circuitProfile?.safetyCarLikelihood ?? 'medium';
-  const baseConfidence: 'low' | 'medium' | 'high' =
+  const baseConf: 'low' | 'medium' | 'high' =
     dataSources.includes('Lap-by-Lap') && stints.length > 15 ? 'high' :
     dataSources.length >= 2 ? 'medium' : 'low';
-
   const overallConfidence: 'low' | 'medium' | 'high' =
-    scLikelihood === 'high' && baseConfidence === 'high' ? 'medium' :
-    scLikelihood === 'high' && baseConfidence === 'medium' ? 'low' :
-    baseConfidence;
+    scLikelihood === 'high' && baseConf === 'high' ? 'medium' :
+    scLikelihood === 'high' && baseConf === 'medium' ? 'low' :
+    baseConf;
 
-  const result: PredictionResult = {
-    predictions,
-    dataSourcesUsed: dataSources,
-    overallConfidence,
-    circuitProfile,
-  };
-
+  const result: PredictionResult = { predictions, dataSourcesUsed: dataSources, overallConfidence, circuitProfile };
   predictionCache.set(cacheKey, result);
   return result;
 }
@@ -719,19 +659,10 @@ export function compareWithActual(
 ): { driverId: number; predicted: number; actual: number; difference: number }[] {
   const sorted = [...actualResults].sort((a, b) => {
     if (a.final_position && b.final_position) return a.final_position - b.final_position;
-    if (a.final_position) return -1;
-    if (b.final_position) return 1;
-    return 0;
+    return a.final_position ? -1 : 1;
   });
-
   return predictions.map((pred) => {
-    const actualResult = sorted.find((r) => r.driver.id === pred.driverId);
-    const actualPos = actualResult?.final_position ?? sorted.length;
-    return {
-      driverId: pred.driverId,
-      predicted: pred.predictedPosition,
-      actual: actualPos,
-      difference: pred.predictedPosition - actualPos,
-    };
+    const actual = sorted.find((r) => r.driver.id === pred.driverId)?.final_position ?? sorted.length;
+    return { driverId: pred.driverId, predicted: pred.predictedPosition, actual, difference: pred.predictedPosition - actual };
   });
 }
