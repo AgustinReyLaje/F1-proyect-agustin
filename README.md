@@ -1,215 +1,180 @@
 # F1 Analytics Platform
 
-Una plataforma fullstack para análisis de datos de Fórmula 1 con arquitectura limpia, construida con **Django REST Framework** (backend) y **Next.js 14** (frontend).
+A full-stack Formula 1 analytics platform built with **Django REST Framework** and **Next.js 14**. Covers race weekends, championship standings, multi-season data, and a circuit-aware race prediction engine.
 
-## ✨ Características
+## Features
 
-### 🏁 **Race Weekend Complete Structure**
-- **Starting Grid**: Qualifying results with team colors
-- **Sprint Races**: Sprint weekend support (when available)
-- **Race Results**: Full race results with podium emphasis
-  - 🥇 Gold, 🥈 Silver, 🥉 Bronze visual styling for P1/P2/P3
-- **DNF Display**: Retirement reasons (Engine failure, Collision, etc.)
-- **Progressive Championship**: Standings after each race (cumulative timeline)
+### Race Weekends
+- Starting grid from qualifying results with team colors
+- Sprint race support (when applicable)
+- Full race results with podium styling (P1/P2/P3)
+- DNF display with retirement reasons (engine, collision, etc.)
+- Progressive championship timeline — standings after every round
 
-### 📊 **Data & Analytics**
-- 📊 Datos reales de F1 desde API externa (Jolpica F1 API)
-- 🏎️ Gestión de pilotos con career statistics (wins, podiums, championships)
-- 🏁 Resultados de carreras y clasificaciones
-- 🏆 Championship standings en tiempo real
-- 🔄 Soporte multi-temporada (2000-2026)
-- 📈 Progressive standings calculation (points accumulation by round)
+### Predictions Engine
+- MOORA multi-criteria analysis (qualifying pace, race pace, consistency, historical data)
+- Circuit-aware weights: qualifying weight rises to 45% at Monaco, drops to 20% at Monza
+- Team circuit affinity: performance at circuits with similar profiles (aero load, tyre wear, overtaking difficulty)
+- Power unit affinity: if McLaren (Mercedes PU) is quick at a power-sensitive circuit, Alpine and Williams get a proportional boost
+- Safety car risk disclaimer on circuits with historically high SC likelihood
+- Prediction vs actual comparison with directional arrows (▲ finished better, ▼ finished worse)
 
-### 🎨 **UI/UX Excellence**
-- 🎨 Interfaz moderna con Next.js 14 y Tailwind CSS
-- 🎯 Driver panel with custom F1-red scrollbar
-- 🖼️ Team colors integrated throughout
-- 📱 Fully responsive design
-- ⚡ Dynamic race detail pages with tabbed navigation
+### Championship Standings
+- Driver and Constructor championships with flag emojis per nationality
+- Visual podium highlighting (gold / silver / bronze)
+- Progressive standings by round via dedicated API endpoint
 
-### 🐳 **DevOps Ready**
-- 🐳 Totalmente dockerizado (backend + frontend + PostgreSQL)
-- 🔧 Hot reload en desarrollo
-- 📦 Production-ready containers
+### Multi-Season Support
+- Seasons from 2000 to 2026
+- Global season selector in the navbar
+- Season-specific team colors, car models, and driver lineups
 
-## 🏗️ Arquitectura
+### UI
+- Responsive design for mobile, tablet, and desktop
+- Dark theme with team color integration throughout
+- Circuit profile badges on the predictions page (aero, tyre wear, power, overtaking, street circuit, SC risk)
+
+## Architecture
 
 ```
 F1Agustin/
+├── backend/                    # Django REST API
+│   ├── api/                    # ViewSets, serializers, URL routing
+│   ├── core/                   # Models and service layer
+│   │   ├── models.py           # 12 Django models
+│   │   └── services/           # External API, championship logic, Wikipedia
+│   └── f1_analytics/           # Django project settings
 │
-├── 🔧 backend/                   # Django REST API
-│   ├── api/                      # API endpoints & serializers
-│   ├── core/                     # Models & business logic
-│   │   ├── models.py             # Database models
-│   │   └── services/             # Service layer
-│   │       ├── f1_api_service.py         # External API integration
-│   │       └── championship_service.py    # Business logic
-│   ├── f1_analytics/             # Django settings
-│   ├── manage.py
-│   ├── requirements.txt
-│   └── Dockerfile
+├── frontend/                   # Next.js 14 (App Router)
+│   └── src/
+│       ├── app/                # Pages: home, drivers, constructors, races, standings, predictions
+│       ├── components/         # Reusable UI components
+│       ├── contexts/           # SeasonContext (global season state)
+│       ├── lib/                # API client, prediction engine, circuit profiles, PU suppliers
+│       └── types/              # TypeScript interfaces
 │
-├── 🎨 frontend/                  # Next.js 14
-│   ├── src/
-│   │   ├── app/                  # Next.js App Router
-│   │   ├── components/           # React components
-│   │   ├── contexts/             # React Context (SeasonContext)
-│   │   ├── lib/                  # API client & utilities
-│   │   └── types/                # TypeScript types
-│   ├── package.json
-│   └── Dockerfile
-│
-├── 🐳 docker/                    # Docker configuration
-│   ├── docker-compose.yml        # Orquestación completa
-│   ├── docker-compose.dev.yml    # Desarrollo
-│   ├── DOCKER.md                 # Guía de Docker
-│   └── DOCKER-QUICKSTART.md      # Quick start
-│
-└── 📚 documentacion/             # Documentation
-    ├── README.md                 # Documentación completa
-    ├── DEPLOYMENT.md             # Guía de deployment
-    ├── QUICKSTART.md             # Inicio rápido
-    ├── START.md                  # Setup local
-    └── API-ALTERNATIVES.md       # Alternativas de API
+└── docker/                     # Docker Compose configuration
+    ├── docker-compose.yml      # Production (PostgreSQL + Gunicorn + Nginx)
+    └── docker-compose.dev.yml  # Development with hot reload
 ```
 
-## 🚀 Quick Start con Docker
+## Quick Start (Docker)
 
-### Prerrequisitos
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) instalado
-- Git
+**Requirements**: Docker Desktop, Git
 
-### 1. Clonar el repositorio
 ```bash
 git clone https://github.com/AgustinReyLaje/F1-proyect-agustin.git
-cd F1-proyect-agustin
-```
+cd F1-proyect-agustin/docker
 
-### 2. Levantar los servicios
-```bash
-cd docker
+# Start all services
 docker compose -f docker-compose.dev.yml up -d --build
-```
 
-Esto levantará:
-- **Backend Django** en `http://localhost:8000`
-- **Frontend Next.js** en `http://localhost:3000`
-- **PostgreSQL** en `localhost:5432`
-
-### 3. Importar datos de F1
-```bash
-# Entrar al contenedor del backend
+# Import F1 data for the current season
 docker compose -f docker-compose.dev.yml exec backend python manage.py import_f1_data --season 2026 --calculate-standings
 ```
 
-### 4. Acceder a la aplicación
-- **Frontend**: http://localhost:3000
-- **API**: http://localhost:8000/api/v1/
-- **Admin Django**: http://localhost:8000/admin/
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:3000 |
+| API | http://localhost:8000/api/v1/ |
+| Django Admin | http://localhost:8000/admin/ |
 
-### 5. Popular datos de race weekend (qualifying y DNF reasons)
+## Local Development (without Docker)
+
 ```bash
-docker-compose exec backend python populate_qualifying.py
+# Backend
+cd backend
+python -m venv venv
+.\venv\Scripts\Activate          # Windows
+source venv/bin/activate          # macOS/Linux
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py import_f1_data --season 2026 --calculate-standings
+python manage.py runserver
+
+# Frontend (separate terminal)
+cd frontend
+npm install
+npm run dev
 ```
 
-## 📖 Documentación Completa
+> The frontend expects the backend at `http://localhost:8000`. Configure via `NEXT_PUBLIC_API_URL` in `frontend/.env.local`.
 
-Para más información detallada, consulta:
-- [📚 Documentación completa](documentacion/README.md)
-- [🏁 Race Weekend Implementation](documentacion/RACE-WEEKEND-IMPLEMENTATION.md) ⭐ **NEW**
-- [🐳 Guía de Docker](docker/DOCKER.md)
-- [⚡ Quick Start](documentacion/QUICKSTART.md)
-- [🚀 Deployment](documentacion/DEPLOYMENT.md)
+## API Reference
 
-## 🛠️ Tecnologías
+Base URL: `http://localhost:8000/api/v1/`
 
-### Backend
-- Python 3.11
-- Django 5.2.11
-- Django REST Framework
-- PostgreSQL 15
-- Gunicorn
+| Endpoint | Description |
+|----------|-------------|
+| `GET /seasons/` | All F1 seasons |
+| `GET /drivers/` | Drivers — filter by `nationality`, `code` |
+| `GET /driver-seasons/` | Season-specific driver data (team, car, stats) |
+| `GET /constructors/` | Teams — filter by `nationality` |
+| `GET /constructor-seasons/` | Season-specific constructor data |
+| `GET /races/` | Races — filter by `season`, `round` |
+| `GET /results/` | Race results — filter by `race`, `driver`, `race__season` |
+| `GET /qualifying/` | Qualifying results with Q1/Q2/Q3 times |
+| `GET /sprint/` | Sprint race results |
+| `GET /free-practice/` | FP1/FP2/FP3 results |
+| `GET /laps/` | Individual lap times |
+| `GET /standings/` | Championship standings — filter by `season`, `standing_type`, `round` |
+| `GET /standings/progressive/` | Cumulative points up to a specific round |
 
-### Frontend
-- Next.js 14 (App Router)
-- TypeScript
-- React 18
-- Tailwind CSS
-- Axios
+All endpoints support pagination (20 per page), filtering, search, and ordering.
 
-### DevOps
-- Docker & Docker Compose
-- PostgreSQL 15 Alpine
-- Multi-stage builds
+**Example queries:**
+```
+GET /api/v1/standings/?season=2026&standing_type=driver
+GET /api/v1/results/?race__season=2026&driver=1
+GET /api/v1/standings/progressive/?season=2026&round=5
+```
 
-## 📝 Características principales
+## Environment Variables
 
-### Race Weekend Complete Structure ⭐ **NEW**
-Sistema completo de fin de semana de carreras con estructura modular:
+**Backend** (`backend/.env`):
+```env
+SECRET_KEY=your-secret-key
+DEBUG=True
+ALLOWED_HOSTS=localhost,127.0.0.1,backend
+CORS_ALLOWED_ORIGINS=http://localhost:3000
+DB_NAME=f1_analytics_db
+DB_USER=f1_user
+DB_PASSWORD=your_password
+DB_HOST=localhost
+DB_PORT=5432
+F1_API_BASE_URL=http://api.jolpi.ca/ergast/f1
+F1_API_RATE_LIMIT=4
+```
 
-#### **1. Race Detail Pages** (`/races/[id]`)
-- **Starting Grid**: Qualifying results con posiciones y equipos
-- **Sprint Race**: Resultados de sprint (cuando aplica)
-- **Race Results**: 
-  - Podio enfatizado con tarjetas grandes 🥇🥈🥉
-  - Gold/Silver/Bronze gradient styling
-  - Tabla completa de todos los finishers
-- **DNF Display**: Razones de retiro ("Engine failure", "Collision", etc.)
-- **Championship Timeline**: Standings progresivos después de cada carrera
+**Frontend** (`frontend/.env.local`):
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+NEXT_PUBLIC_API_URL_SERVER=http://backend:8000/api/v1
+```
 
-#### **2. Progressive Championship Standings**
-- **API Endpoint**: `/api/v1/standings/progressive/`
-- **Funcionalidad**: Calcula puntos acumulados desde Race 1 hasta round específico
-- **Uso**: Ver cómo estaba el campeonato después de cada carrera
-- **Ejemplo**: 
-  - Round 5: Verstappen 110 pts, Norris 83 pts
-  - Round 12: Verstappen 265 pts, Norris 189 pts
-  - Round 24: Verstappen 399 pts, Norris 344 pts
+## Tech Stack
 
-#### **3. Driver Panel Improvements**
-- ✅ Mayor ancho de panel izquierdo (384px)
-- ✅ Scrollbar personalizado con color F1-red
-- ✅ Scroll independiente para detalles del piloto
-- ✅ Layout protegido que nunca colapsa
+| Layer | Technology |
+|-------|-----------|
+| Backend framework | Django 5.2 + Django REST Framework 3.15 |
+| Database | PostgreSQL 15 |
+| WSGI server | Gunicorn |
+| Frontend framework | Next.js 14 (App Router) + TypeScript |
+| Styling | Tailwind CSS |
+| HTTP client | Axios |
+| Charts | Recharts |
+| Containerization | Docker + Docker Compose |
 
-### Multi-Season Support
-Sistema completo de soporte para múltiples temporadas (2000-2026):
-- Selector de temporada global en el navbar
-- Todas las vistas se actualizan automáticamente al cambiar temporada
-- Datos persistentes con modelos Season, ConstructorSeason, DriverSeason
+## Detailed Documentation
 
-### Championship Standings
-- Visualización de clasificaciones de pilotos y constructores
-- Efectos visuales especiales para el podio (oro/plata/bronce)
-- Cálculo en tiempo real basado en resultados de carreras
-- **Standings progresivos por round** ⭐ **NEW**
+- [Technical Reference](documentacion/README.md) — models, prediction engine, data import
+- [Docker Guide](docker/DOCKER.md) — full Docker setup and commands
+- [Deployment](documentacion/DEPLOYMENT.md) — production deployment guide
 
-### Constructor Cards
-- Tarjetas con información de equipos
-- Efectos de brillo para posiciones de campeonato
-- Imágenes de autos por temporada
-- Colores oficiales de equipos
-- **P1/P2/P3 color badges** ⭐ **NEW**
+## Author
 
-## 🤝 Contribuir
+**Agustín Rey Laje** — [@AgustinReyLaje](https://github.com/AgustinReyLaje)
 
-Las contribuciones son bienvenidas. Para cambios importantes:
-1. Fork el proyecto
-2. Crea tu Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
-4. Push a la Branch (`git push origin feature/AmazingFeature`)
-5. Abre un Pull Request
+## License
 
-## 📄 Licencia
-
-Este proyecto es de código abierto y está disponible bajo la licencia MIT.
-
-## 👤 Autor
-
-**Agustín Rey Laje**
-- GitHub: [@AgustinReyLaje](https://github.com/AgustinReyLaje)
-- Proyecto: [F1 Analytics Platform](https://github.com/AgustinReyLaje/F1-proyect-agustin)
-
----
-
-⭐ Si te gusta este proyecto, dale una estrella en GitHub!
+MIT
