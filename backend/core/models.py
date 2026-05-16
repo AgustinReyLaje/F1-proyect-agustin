@@ -28,7 +28,7 @@ class Constructor(models.Model):
     url = models.URLField(blank=True, null=True)
     # Keep season-specific fields for backward compatibility
     car_model = models.CharField(max_length=50, blank=True, null=True, help_text="Car model name for current season")
-    car_image_url = models.URLField(blank=True, null=True, help_text="URL to car image")
+    car_image_url = models.URLField(max_length=500, blank=True, null=True, help_text="URL to car image")
     team_color = models.CharField(max_length=7, blank=True, null=True, help_text="Team primary color in hex format")
     team_color_secondary = models.CharField(max_length=7, blank=True, null=True, help_text="Team secondary color")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -51,7 +51,7 @@ class ConstructorSeason(models.Model):
     constructor = models.ForeignKey(Constructor, on_delete=models.CASCADE, related_name='season_data')
     season = models.ForeignKey(Season, on_delete=models.CASCADE, related_name='constructor_data')
     car_model = models.CharField(max_length=50, blank=True, null=True, help_text="Car model name for the season")
-    car_image_url = models.URLField(blank=True, null=True, help_text="URL to car image")
+    car_image_url = models.URLField(max_length=500, blank=True, null=True, help_text="URL to car image")
     team_color = models.CharField(max_length=7, blank=True, null=True, help_text="Team primary color in hex format")
     team_color_secondary = models.CharField(max_length=7, blank=True, null=True, help_text="Team secondary color")
     created_at = models.DateTimeField(auto_now_add=True)
