@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { f1Api } from '@/lib/api';
 import { Race, Result, Lap } from '@/types/f1';
-import { ArrowLeft, Zap, Loader2, ChevronDown, TrendingUp, AlertCircle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Zap, Loader2, ChevronDown, TrendingUp, AlertCircle, CheckCircle, Wind, Thermometer, Radio } from 'lucide-react';
 import { useSeason } from '@/contexts/SeasonContext';
 import { predictRace, compareWithActual, PredictionResult, PredictionFilters, TyreCompound, LapInput } from '@/lib/predictionEngine';
 import LoadingSkeleton from '@/components/LoadingSkeleton';
@@ -146,15 +146,22 @@ export default function PredictionsPage() {
         lapData = [];
       }
 
+      // Collect circuit IDs of previous races for affinity scoring
+      const previousRaceCircuitIds = prevRaces.map((r) => r.circuit_id).filter(Boolean);
+
       // Run prediction engine
-      const result = predictRace({
-        qualifying,
-        freePractice,
-        previousResults: previousResults.reverse(), // Chronological order
-        lapData,
-        filters,
-        totalLaps: selectedRace.round > 0 ? 58 : 56,
-      });
+      const result = predictRace(
+        {
+          qualifying,
+          freePractice,
+          previousResults: previousResults.reverse(), // Chronological order
+          lapData,
+          filters,
+          totalLaps: selectedRace.round > 0 ? 58 : 56,
+          circuitId: selectedRace.circuit_id,
+        },
+        previousRaceCircuitIds
+      );
 
       setPrediction(result);
 
@@ -224,6 +231,16 @@ export default function PredictionsPage() {
           <p className="text-gray-300">
             AI-powered predictions based on qualifying, practice, and historical data for the {currentSeason} season
           </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-yellow-900/30 border border-yellow-600/40 text-yellow-300">
+              <AlertCircle className="w-3 h-3" />
+              {currentSeason} season data only — prior seasons not comparable (new regulations)
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-yellow-900/30 border border-yellow-600/40 text-yellow-300">
+              <AlertCircle className="w-3 h-3" />
+              Assumes green flag racing — Safety Cars and VSC can significantly alter results
+            </span>
+          </div>
         </div>
 
         {loading ? (
@@ -330,17 +347,70 @@ export default function PredictionsPage() {
 
             {/* Prediction Info */}
             {prediction && (
-              <div className="mb-6 flex flex-wrap gap-3 items-center">
-                {/* Overall Confidence */}
-                <div className={`px-4 py-2 rounded-lg border ${confidenceColors[prediction.overallConfidence].bg} ${confidenceColors[prediction.overallConfidence].border}`}>
-                  <span className={`text-sm font-bold ${confidenceColors[prediction.overallConfidence].text}`}>
-                    {prediction.overallConfidence.toUpperCase()} CONFIDENCE
-                  </span>
+              <div className="mb-6 space-y-3">
+                <div className="flex flex-wrap gap-3 items-center">
+                  {/* Overall Confidence */}
+                  <div className={`px-4 py-2 rounded-lg border ${confidenceColors[prediction.overallConfidence].bg} ${confidenceColors[prediction.overallConfidence].border}`}>
+                    <span className={`text-sm font-bold ${confidenceColors[prediction.overallConfidence].text}`}>
+                      {prediction.overallConfidence.toUpperCase()} CONFIDENCE
+                    </span>
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    Sources: {prediction.dataSourcesUsed.join(', ') || 'None'}
+                  </div>
                 </div>
-                {/* Data sources label */}
-                <div className="text-sm text-gray-500">
-                  Sources: {prediction.dataSourcesUsed.join(', ') || 'None'}
-                </div>
+
+                {/* Circuit profile badges */}
+                {prediction.circuitProfile && (
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <span className="text-xs text-gray-500 uppercase font-bold tracking-wider">Circuit:</span>
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
+                      prediction.circuitProfile.aeroLoad === 'high' ? 'bg-blue-900/40 border-blue-500/40 text-blue-300' :
+                      prediction.circuitProfile.aeroLoad === 'low' ? 'bg-orange-900/40 border-orange-500/40 text-orange-300' :
+                      'bg-gray-800 border-gray-600 text-gray-300'
+                    }`}>
+                      <Wind className="w-3 h-3 inline mr-1" />
+                      Aero {prediction.circuitProfile.aeroLoad}
+                    </span>
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
+                      prediction.circuitProfile.tireWear === 'high' ? 'bg-red-900/40 border-red-500/40 text-red-300' :
+                      prediction.circuitProfile.tireWear === 'low' ? 'bg-green-900/40 border-green-500/40 text-green-300' :
+                      'bg-gray-800 border-gray-600 text-gray-300'
+                    }`}>
+                      <Thermometer className="w-3 h-3 inline mr-1" />
+                      Tyre wear {prediction.circuitProfile.tireWear}
+                    </span>
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
+                      prediction.circuitProfile.powerSensitivity === 'high' ? 'bg-yellow-900/40 border-yellow-500/40 text-yellow-300' :
+                      prediction.circuitProfile.powerSensitivity === 'low' ? 'bg-purple-900/40 border-purple-500/40 text-purple-300' :
+                      'bg-gray-800 border-gray-600 text-gray-300'
+                    }`}>
+                      <Radio className="w-3 h-3 inline mr-1" />
+                      Power {prediction.circuitProfile.powerSensitivity}
+                    </span>
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
+                      prediction.circuitProfile.overtakingDifficulty === 'hard' ? 'bg-red-900/40 border-red-500/40 text-red-300' :
+                      prediction.circuitProfile.overtakingDifficulty === 'easy' ? 'bg-green-900/40 border-green-500/40 text-green-300' :
+                      'bg-gray-800 border-gray-600 text-gray-300'
+                    }`}>
+                      Overtaking {prediction.circuitProfile.overtakingDifficulty}
+                    </span>
+                    {prediction.circuitProfile.streetCircuit && (
+                      <span className="px-2.5 py-1 rounded-full text-xs font-bold border bg-indigo-900/40 border-indigo-500/40 text-indigo-300">
+                        Street Circuit
+                      </span>
+                    )}
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
+                      prediction.circuitProfile.safetyCarLikelihood === 'high'
+                        ? 'bg-yellow-900/40 border-yellow-500/40 text-yellow-300'
+                        : prediction.circuitProfile.safetyCarLikelihood === 'medium'
+                        ? 'bg-gray-800 border-gray-600 text-gray-300'
+                        : 'bg-green-900/40 border-green-500/40 text-green-300'
+                    }`}>
+                      SC risk {prediction.circuitProfile.safetyCarLikelihood}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -485,18 +555,30 @@ export default function PredictionsPage() {
                 <Zap className="w-5 h-5 text-f1-red" />
                 Prediction Methodology
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-400">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm text-gray-400">
                 <div className="p-3 bg-gray-800/40 rounded-lg">
-                  <div className="font-bold text-white mb-1">Qualifying (40%)</div>
-                  <p>Qualifying position is the strongest predictor. Higher weight for grid position.</p>
+                  <div className="font-bold text-white mb-1">Qualifying (20–45%)</div>
+                  <p>Weight increases on low-overtaking circuits (Monaco 45%) and drops on DRS tracks (Monza 20%).</p>
                 </div>
                 <div className="p-3 bg-gray-800/40 rounded-lg">
-                  <div className="font-bold text-white mb-1">Free Practice (25%)</div>
-                  <p>Average of FP1, FP2, FP3 positions shows race pace potential.</p>
+                  <div className="font-bold text-white mb-1">Race Pace (25–55%)</div>
+                  <p>Based on lap data stints and free practice. More relevant on high-overtaking circuits.</p>
                 </div>
                 <div className="p-3 bg-gray-800/40 rounded-lg">
-                  <div className="font-bold text-white mb-1">Historical (35%)</div>
-                  <p>Last 5 race finishes with exponential decay — recent form matters most.</p>
+                  <div className="font-bold text-white mb-1">Tyre Consistency (6–18%)</div>
+                  <p>Weight increases at high tire-wear circuits like Bahrain or Spain.</p>
+                </div>
+                <div className="p-3 bg-gray-800/40 rounded-lg">
+                  <div className="font-bold text-white mb-1">Team Circuit Affinity (7%)</div>
+                  <p>How the whole team (including teammates) performed at similar circuit types this season.</p>
+                </div>
+                <div className="p-3 bg-gray-800/40 rounded-lg">
+                  <div className="font-bold text-white mb-1">PU Affinity (3–9%)</div>
+                  <p>At power-sensitive circuits (Monza, Baku, Spa), teams sharing the same engine supplier get a collective boost based on their performance at similar tracks.</p>
+                </div>
+                <div className="p-3 bg-gray-800/40 rounded-lg">
+                  <div className="font-bold text-white mb-1">Recent Form (5–15%)</div>
+                  <p>Last 5 race results with exponential decay — most recent carries highest weight.</p>
                 </div>
               </div>
             </div>
