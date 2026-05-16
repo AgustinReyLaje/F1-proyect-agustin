@@ -514,15 +514,15 @@ export default function PredictionsPage() {
                             </div>
                             <div className={`text-sm font-bold ${
                               comp.difference === 0 ? 'text-green-400' :
-                              Math.abs(comp.difference) <= 2 ? 'text-yellow-400' :
+                              comp.difference > 0 ? 'text-green-400' :
                               'text-red-400'
                             }`}>
                               {comp.difference === 0 ? (
                                 <CheckCircle className="w-5 h-5" />
                               ) : comp.difference > 0 ? (
-                                <span>▼{Math.abs(comp.difference)}</span>
-                              ) : (
                                 <span>▲{Math.abs(comp.difference)}</span>
+                              ) : (
+                                <span>▼{Math.abs(comp.difference)}</span>
                               )}
                             </div>
                           </div>

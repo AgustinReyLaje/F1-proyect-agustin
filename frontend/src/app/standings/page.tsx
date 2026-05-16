@@ -9,6 +9,40 @@ import { useSeason } from '@/contexts/SeasonContext';
 
 type StandingType = 'driver' | 'constructor';
 
+const NATIONALITY_FLAGS: Record<string, string> = {
+  'British': '🇬🇧',
+  'Dutch': '🇳🇱',
+  'Monégasque': '🇲🇨',
+  'Spanish': '🇪🇸',
+  'Mexican': '🇲🇽',
+  'Finnish': '🇫🇮',
+  'Australian': '🇦🇺',
+  'Canadian': '🇨🇦',
+  'German': '🇩🇪',
+  'French': '🇫🇷',
+  'Argentine': '🇦🇷',
+  'Argentinian': '🇦🇷',
+  'Thai': '🇹🇭',
+  'Japanese': '🇯🇵',
+  'Chinese': '🇨🇳',
+  'Italian': '🇮🇹',
+  'Brazilian': '🇧🇷',
+  'Danish': '🇩🇰',
+  'American': '🇺🇸',
+  'New Zealander': '🇳🇿',
+  'Austrian': '🇦🇹',
+  'Swiss': '🇨🇭',
+  'Belgian': '🇧🇪',
+  'Polish': '🇵🇱',
+  'Russian': '🇷🇺',
+  'Swedish': '🇸🇪',
+  'Portuguese': '🇵🇹',
+  'South African': '🇿🇦',
+  'Indian': '🇮🇳',
+  'Colombian': '🇨🇴',
+  'Venezuelan': '🇻🇪',
+};
+
 // Team logo mapping for 2024/2025 seasons
 const TEAM_LOGOS: Record<string, string> = {
   'Red Bull': '/images/teams/2024Season/Oracle_Red_Bull_Racing.png',
@@ -255,10 +289,17 @@ export default function StandingsPage() {
                           </td>
                           <td className="px-6 py-5 whitespace-nowrap">
                             {standingType === 'driver' ? (
-                              <div className={`font-bold text-lg ${
-                                index < 3 ? 'text-white' : 'text-gray-200'
-                              }`}>
-                                {standing.driver?.full_name}
+                              <div className="flex items-center gap-2">
+                                {standing.driver?.nationality && (
+                                  <span className="text-xl" title={standing.driver.nationality}>
+                                    {NATIONALITY_FLAGS[standing.driver.nationality] ?? '🏁'}
+                                  </span>
+                                )}
+                                <span className={`font-bold text-lg ${
+                                  index < 3 ? 'text-white' : 'text-gray-200'
+                                }`}>
+                                  {standing.driver?.full_name}
+                                </span>
                               </div>
                             ) : (
                               <div className="flex items-center gap-3">
