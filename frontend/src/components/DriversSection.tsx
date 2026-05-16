@@ -25,26 +25,19 @@ export default function DriversSection({
       aria-label="Drivers list"
     >
       {/* Grid layout - responsive: vertical on mobile, grid on large screens */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 auto-rows-max">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {drivers.map((driver) => {
           const isOtherHovered = hoveredDriverId !== null && hoveredDriverId !== driver.id;
           const seasonData = driversSeasonData?.get(driver.id);
 
           return (
-            <div
+            <DriverCard
               key={driver.id}
-              className={`
-                transition-all duration-500 ease-in-out
-                ${hoveredDriverId === driver.id ? 'col-span-full' : ''}
-              `}
-            >
-              <DriverCard
-                driver={driver}
-                seasonData={seasonData}
-                isOtherHovered={isOtherHovered}
-                onHoverChange={(isHovered) => handleDriverHover(driver.id, isHovered)}
-              />
-            </div>
+              driver={driver}
+              seasonData={seasonData}
+              isOtherHovered={isOtherHovered}
+              onHoverChange={(isHovered) => handleDriverHover(driver.id, isHovered)}
+            />
           );
         })}
       </div>
